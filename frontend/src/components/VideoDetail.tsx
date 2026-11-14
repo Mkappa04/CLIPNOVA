@@ -1,5 +1,6 @@
-import { CheckCircle2, RefreshCw, Save, ShieldAlert, Trash2, XCircle } from 'lucide-react'
+import { CheckCircle2, RefreshCw, Save, ScanSearch, ShieldAlert, Trash2, XCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { api } from '../services/api'
 import { formatBytes, formatDate, formatDuration, resolution } from '../services/format'
@@ -154,7 +155,12 @@ export function VideoDetail({ videoId, onClose, onChanged }: { videoId: string |
                 <button className="btn-ghost" onClick={() => setConfirmDelete(false)}>Annulla</button>
               </div>
             )}
-            <button className="btn-primary" onClick={save}><Save size={15} /> Salva modifiche</button>
+            <div className="flex gap-2">
+              {['ready', 'analyzed', 'analyzing'].includes(video.status) && (
+                <Link to={`/detection?video=${video.id}`} className="btn-cyan"><ScanSearch size={15} /> {video.status === 'analyzed' ? `Clip (${video.clip_count})` : 'Analizza'}</Link>
+              )}
+              <button className="btn-primary" onClick={save}><Save size={15} /> Salva modifiche</button>
+            </div>
           </div>
         </div>
       )}

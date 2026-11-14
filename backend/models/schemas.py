@@ -82,6 +82,7 @@ class VideoOut(ORMModel):
     error: str | None
     has_thumbnail: bool = False
     clip_count: int = 0
+    analysis_status: str | None = None
     rights: RightsOut | None = None
     created_at: UTCDateTime
     updated_at: UTCDateTime
@@ -127,3 +128,67 @@ class JobOut(ORMModel):
     created_at: UTCDateTime
     started_at: UTCDateTime | None
     finished_at: UTCDateTime | None
+
+
+# ---------------------------------------------------------------- analysis & clips (Milestone 2)
+from backend.clip_detection.scoring import ScoringConfig  # noqa: E402
+from backend.models.entities import ClipCategory  # noqa: E402
+
+
+class AnalyzeRequest(BaseModel):
+    language: Literal["auto", "it", "en"] = "auto"
+    transcribe: bool = True
+    force: bool = Field(False, description="Ignore cached proxy/audio/transcript")
+    scoring: ScoringConfig | None = None
+
+
+class AnalysisOut(ORMModel):
+    status: str
+    language: str
+    transcription_device: str
+    whisper_model: str
+    scenes: list[float]
+    stats: dict[str, Any]
+    config: dict[str, Any]
+    error: str | None
+    updated_at: UTCDateTime
+
+
+class ClipOut(ORMModel):
+    id: str
+    video_id: str
+    start: float
+    end: float
+    duration: float
+    category: str
+    score: float
+    confidence: float
+    transcript: str
+    reason: str
+    suggested_title: str
+    status: str
+    origin: str
+    peak_time: float | None
+    language: str
+    signals: dict[str, Any]
+    category_scores: dict[str, Any]
+    keywords: list[str]
+    video_title: str = ""
+    game: str = ""
+    created_at: UTCDateTime
+    updated_at: UTCDateTime
+
+
+class ClipCreate(BaseModel):
+    start: float = Field(ge=0)
+    end: float = Field(gt=0)
+    category: ClipCategory = ClipCategory.GAMEPLAY_HIGHLIGHT
+    suggested_title: str = Field("", max_length=300)
+
+
+class ClipUpdate(BaseModel):
+    start: float | None = Field(default=None, ge=0)
+    end: float | None = Field(default=None, gt=0)
+    category: ClipCategory | None = None
+    suggested_title: str | None = Field(default=None, max_length=300)
+    status: Literal["detected", "review", "rejected", "archived"] | None = None

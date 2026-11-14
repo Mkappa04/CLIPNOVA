@@ -38,14 +38,14 @@ export function Badge({ tone = 'zinc', children, className }: { tone?: Tone; chi
 const STATUS_TONES: Record<string, Tone> = {
   ready: 'green', analyzed: 'green', completed: 'green', approved: 'green', authorized: 'green',
   pending: 'zinc', queued: 'zinc', unknown: 'zinc',
-  copying: 'cyan', probing: 'cyan', analyzing: 'cyan', running: 'cyan',
+  copying: 'cyan', probing: 'cyan', analyzing: 'cyan', running: 'cyan', detected: 'violet',
   error: 'red', failed: 'red', denied: 'red', rejected: 'red',
   cancelled: 'amber', review: 'amber',
 }
 const STATUS_LABELS: Record<string, string> = {
   ready: 'pronto', analyzed: 'analizzato', completed: 'completato', pending: 'in attesa', queued: 'in coda',
   copying: 'copia', probing: 'lettura', analyzing: 'analisi', running: 'in corso', error: 'errore',
-  failed: 'fallito', cancelled: 'annullato', authorized: 'autorizzato', denied: 'negato', unknown: 'sconosciuto',
+  failed: 'fallito', cancelled: 'annullato', detected: 'rilevata', review: 'revisione', rejected: 'scartata', archived: 'archiviata', authorized: 'autorizzato', denied: 'negato', unknown: 'sconosciuto',
 }
 
 export function StatusBadge({ status }: { status: string }) {

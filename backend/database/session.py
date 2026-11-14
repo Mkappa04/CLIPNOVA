@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
@@ -44,10 +45,31 @@ def get_engine() -> Engine:
     return _engine
 
 
+BASELINE_REVISION = "0001"
+
+
 def init_db() -> None:
+    """Bring the schema to the latest Alembic revision.
+
+    Databases created by Milestone 1 (create_all, no alembic_version table)
+    are stamped with the baseline revision first, then upgraded.
+    """
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import inspect
+
     import backend.models  # noqa: F401  (register tables)
 
-    Base.metadata.create_all(get_engine())
+    engine = get_engine()
+    cfg = Config()
+    cfg.set_main_option("script_location", str(Path(__file__).parent / "migrations"))
+    cfg.set_main_option("sqlalchemy.url", engine.url.render_as_string(hide_password=False))
+    with engine.begin() as conn:
+        cfg.attributes["connection"] = conn
+        tables = set(inspect(conn).get_table_names())
+        if "videos" in tables and "alembic_version" not in tables:
+            command.stamp(cfg, BASELINE_REVISION)
+        command.upgrade(cfg, "head")
 
 
 def get_db() -> Iterator[Session]:

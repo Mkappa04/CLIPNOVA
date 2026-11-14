@@ -11,7 +11,7 @@ import { cx } from './ui'
 export const NAV = [
   { to: '/', label: 'Dashboard', icon: Gauge },
   { to: '/library', label: 'Video Library', icon: Film },
-  { to: '/detection', label: 'Clip Detection', icon: ScanSearch, milestone: 2 },
+  { to: '/detection', label: 'Clip Detection', icon: ScanSearch },
   { to: '/editor', label: 'Clip Editor', icon: Clapperboard, milestone: 3 },
   { to: '/subtitles', label: 'Subtitle Editor', icon: Captions, milestone: 3 },
   { to: '/render', label: 'Render Queue', icon: Layers },

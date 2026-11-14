@@ -1,0 +1,9 @@
+# CLIPNOVA AI/analysis stack (Milestone 2). ~1.5 GB of wheels; Whisper weights download on first use.
+# No PyTorch needed: faster-whisper runs on CTranslate2; CUDA 12 runtime libs come from pip wheels
+# (they use the Windows NVIDIA driver exposed by WSL; no Linux driver is installed).
+numpy>=1.26,<3
+opencv-python>=4.9  # required by scenedetect (headless variant would conflict)
+scenedetect>=0.6.4,<0.8
+faster-whisper>=1.1,<2
+nvidia-cublas-cu12>=12.4,<13
+nvidia-cudnn-cu12>=9.1,<10

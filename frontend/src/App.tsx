@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
+import { ClipDetection } from './pages/ClipDetection'
 import { ComingSoon } from './pages/ComingSoon'
 import { Dashboard } from './pages/Dashboard'
 import { RenderQueue } from './pages/RenderQueue'
@@ -12,9 +13,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/library" element={<VideoLibrary />} />
-        <Route path="/detection" element={<ComingSoon title="Clip Detection" milestone={2} features={[
-          'Scene detection (PySceneDetect)', 'Picchi audio e silenzi', 'Trascrizione faster-whisper (GPU/CPU)',
-          'Keyword e categorie (Funny, Rage, Epic, Fail…)', 'Score configurabile + confidence', 'Anteprima clip']} />} />
+        <Route path="/detection" element={<ClipDetection />} />
         <Route path="/editor" element={<ComingSoon title="Clip Editor" milestone={3} features={[
           'Export 1080×1920 H.264/AAC', 'Layout gameplay / webcam / PiP / split', 'Smart crop e reframing',
           'Zoom dinamici e transizioni', 'Normalizzazione audio', 'Intro/outro opzionali']} />} />

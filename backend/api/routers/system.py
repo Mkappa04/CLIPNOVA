@@ -41,6 +41,7 @@ def settings() -> dict:
         "worker_concurrency": s.worker_concurrency, "use_gpu": s.use_gpu, "max_vram_mb": s.max_vram_mb,
         "default_language": s.default_language, "publishing_enabled": s.publishing_enabled,
         "supported_extensions": sorted(SUPPORTED_VIDEO_EXTENSIONS),
+        "whisper_model": s.whisper_model, "whisper_cpu_model": s.whisper_cpu_model,
     }
 
 

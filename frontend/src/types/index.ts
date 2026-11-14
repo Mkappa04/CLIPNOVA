@@ -51,6 +51,7 @@ export interface Video {
   error: string | null
   has_thumbnail: boolean
   clip_count: number
+  analysis_status: 'running' | 'completed' | 'failed' | null
   rights: Rights | null
   created_at: string
   updated_at: string
@@ -108,7 +109,11 @@ export interface SystemInfo {
     utilization_pct?: number | null
   }
   ffmpeg: { ffmpeg: string | null; ffprobe: string | null; nvenc_h264: boolean; hwaccels: string[] }
-  ai: { modules: Record<string, boolean>; cuda_available: boolean | null; torch_version?: string }
+  ai: {
+    modules: Record<string, boolean>
+    cuda_available: boolean | null
+    whisper?: { gpu_model: string; cpu_model: string; gpu_compute: string; min_free_vram_mb: number; keep_loaded: boolean; cached_models: string[] }
+  }
 }
 
 export interface AppSettings {
@@ -125,6 +130,8 @@ export interface AppSettings {
   default_language: string
   publishing_enabled: boolean
   supported_extensions: string[]
+  whisper_model: string
+  whisper_cpu_model: string
 }
 
 export const EMPTY_RIGHTS: Rights = {
@@ -138,4 +145,92 @@ export const EMPTY_RIGHTS: Rights = {
   expires_at: null,
   restrictions: '',
   evidence: '',
+}
+
+// ---------------------------------------------------------------- Milestone 2
+export type ClipCategory =
+  | 'funny' | 'rage' | 'epic' | 'fail' | 'reaction' | 'clutch' | 'storytelling' | 'unexpected' | 'gameplay_highlight'
+export type ClipStatus = 'detected' | 'editing' | 'rendering' | 'review' | 'approved' | 'rejected' | 'archived' | 'exported'
+
+export interface Clip {
+  id: string
+  video_id: string
+  start: number
+  end: number
+  duration: number
+  category: ClipCategory
+  score: number
+  confidence: number
+  transcript: string
+  reason: string
+  suggested_title: string
+  status: ClipStatus
+  origin: 'auto' | 'manual'
+  peak_time: number | null
+  language: string
+  signals: Record<string, number>
+  category_scores: Record<string, number>
+  keywords: string[]
+  video_title: string
+  game: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ScoringWeights {
+  audio_peak: number
+  audio_energy: number
+  speech_excitement: number
+  keywords: number
+  laughter: number
+  visual_motion: number
+  scene_changes: number
+}
+
+export interface ScoringConfig {
+  weights: ScoringWeights
+  min_clip_s: number
+  max_clip_s: number
+  pre_roll_s: number
+  post_roll_s: number
+  max_clips: number
+  min_score: number
+  min_gap_s: number
+  smoothing_s: number
+  reason_language: 'it' | 'en'
+}
+
+export interface Analysis {
+  status: 'running' | 'completed' | 'failed'
+  language: string
+  transcription_device: string
+  whisper_model: string
+  scenes: number[]
+  stats: {
+    decoder?: string
+    media_cached?: boolean
+    timings?: Record<string, number>
+    audio?: { median_db?: number; peaks?: number; silence_ratio?: number; has_audio?: boolean }
+    scenes?: number
+    transcript?: { segments: number; words: number; language_probability: number; elapsed_s: number; filtered_hallucinations: number }
+  }
+  config: Partial<ScoringConfig>
+  error: string | null
+  updated_at: string
+}
+
+export interface TimelineData {
+  step_s: number
+  interest: number[]
+  audio: number[]
+  speech: number[]
+  motion: number[]
+  scenes: number[]
+  laughs: number[]
+  keywords: { time: number; category: string; keyword: string }[]
+}
+
+export interface AnalysisResponse {
+  analysis: Analysis | null
+  timeline: TimelineData | null
 }

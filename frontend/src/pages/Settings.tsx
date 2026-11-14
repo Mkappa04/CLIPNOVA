@@ -60,9 +60,15 @@ export function Settings() {
           </Panel>
 
           <Panel title="AI runtime" icon={<Sparkles size={18} />}>
-            {Object.entries(sys.ai.modules).map(([m, ok]) => <Row key={m} k={m} v={yes(ok, 'installato', 'Milestone 2')} />)}
-            <Row k="CUDA (PyTorch)" v={sys.ai.cuda_available === null ? <Badge>n/d</Badge> : yes(sys.ai.cuda_available)} />
-            <p className="mt-2 text-xs text-zinc-500">I modelli AI locali (faster-whisper, ecc.) verranno installati in Milestone 2 dopo verifica dello spazio disco.</p>
+            {Object.entries(sys.ai.modules).map(([m, ok]) => <Row key={m} k={m} v={yes(ok, 'installato', 'mancante')} />)}
+            <Row k="CUDA (CTranslate2)" v={sys.ai.cuda_available === null ? <Badge>n/d</Badge> : yes(sys.ai.cuda_available, 'attivo', 'CPU')} />
+            {sys.ai.whisper && (<>
+              <Row k="Whisper GPU" v={`${sys.ai.whisper.gpu_model} (${sys.ai.whisper.gpu_compute})`} />
+              <Row k="Whisper CPU (fallback)" v={sys.ai.whisper.cpu_model} />
+              <Row k="VRAM minima per GPU" v={`${sys.ai.whisper.min_free_vram_mb} MB`} />
+              <Row k="Modelli in cache" v={sys.ai.whisper.cached_models.join(', ') || 'nessuno (download al primo uso)'} />
+            </>)}
+            <p className="mt-2 text-xs text-zinc-500">Tutto gira in locale. I pesi Whisper vengono scaricati una volta da Hugging Face in data/models.</p>
           </Panel>
 
           <Panel title="Storage & FFmpeg" icon={<HardDrive size={18} />}>

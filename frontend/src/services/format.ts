@@ -37,6 +37,7 @@ export function resolution(w: number | null, h: number | null): string {
 export const JOB_LABELS: Record<string, string> = {
   'video.probe': 'Analisi metadati',
   'video.copy_import': 'Copia + import',
+  'video.analyze': 'Analisi AI + clip detection',
 }
 
 export const LICENSE_LABELS: Record<string, string> = {
@@ -56,4 +57,38 @@ export const AUTH_LABELS: Record<string, string> = {
   pending: 'In attesa',
   denied: 'Negato',
   unknown: 'Sconosciuto',
+}
+
+/**
+ * Category identity colours: fixed slot order of the validated categorical palette
+ * (dark-surface steps, checked against #0a0a12). gameplay_highlight is the neutral "other".
+ * Colour always ships with the text label (never colour alone).
+ */
+export const CATEGORIES: { id: import('../types').ClipCategory; label: string; color: string; emoji: string }[] = [
+  { id: 'funny', label: 'Funny', color: '#3987e5', emoji: '😂' },
+  { id: 'rage', label: 'Rage', color: '#d95926', emoji: '😡' },
+  { id: 'epic', label: 'Epic', color: '#199e70', emoji: '🔥' },
+  { id: 'fail', label: 'Fail', color: '#c98500', emoji: '💀' },
+  { id: 'reaction', label: 'Reaction', color: '#d55181', emoji: '😱' },
+  { id: 'clutch', label: 'Clutch', color: '#0ca30c', emoji: '😮‍💨' },
+  { id: 'storytelling', label: 'Storytelling', color: '#9085e9', emoji: '🎙️' },
+  { id: 'unexpected', label: 'Unexpected', color: '#e66767', emoji: '🤯' },
+  { id: 'gameplay_highlight', label: 'Gameplay Highlight', color: '#8b8b9e', emoji: '⚡' },
+]
+export const CATEGORY_BY_ID = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]))
+
+export const SIGNAL_LABELS: Record<string, string> = {
+  audio_peak: 'Picchi audio',
+  audio_energy: 'Energia audio',
+  speech_excitement: 'Parlato concitato',
+  keywords: 'Keyword',
+  laughter: 'Risate',
+  visual_motion: 'Movimento',
+  scene_changes: 'Cambi scena',
+}
+
+export function formatTime(t: number): string {
+  const m = Math.floor(t / 60)
+  const s = t - m * 60
+  return `${m}:${s.toFixed(1).padStart(4, '0')}`
 }

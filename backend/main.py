@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.api.routers import jobs, system, videos
+from backend.api.routers import analysis, clips, jobs, system, videos
 from backend.core.config import PROJECT_ROOT, get_settings
 from backend.core.exceptions import ClipnovaError
 from backend.core.logging import setup_logging
@@ -66,6 +66,8 @@ def create_app() -> FastAPI:
     app.include_router(system.router)
     app.include_router(videos.router)
     app.include_router(jobs.router)
+    app.include_router(analysis.router)
+    app.include_router(clips.router)
 
     _mount_frontend(app)
     return app

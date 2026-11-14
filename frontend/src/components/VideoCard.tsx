@@ -35,6 +35,7 @@ export function VideoCard({ video, onOpen }: { video: Video; onOpen: () => void 
           <Badge tone="violet">{video.game}</Badge>
           <RightsPill video={video} />
           {video.storage_mode === 'referenced' && <Badge tone="zinc">Rif.</Badge>}
+          {video.clip_count > 0 && <Badge tone="cyan">{video.clip_count} clip</Badge>}
         </div>
         <div className="flex justify-between text-xs text-zinc-500">
           <span>{resolution(video.width, video.height)}{video.fps ? ` · ${Math.round(video.fps)} fps` : ''}</span>

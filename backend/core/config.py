@@ -46,6 +46,24 @@ class Settings(BaseSettings):
     max_vram_mb: int = 4500
 
     default_language: str = "it"
+
+    # --- Transcription (faster-whisper). GPU model is used when enough VRAM is free.
+    whisper_model: str = "large-v3-turbo"
+    whisper_cpu_model: str = "small"
+    whisper_compute_type_gpu: str = "int8_float16"
+    whisper_compute_type_cpu: str = "int8"
+    whisper_min_free_vram_mb: int = 2000
+    whisper_keep_loaded: bool = False   # False = free VRAM after each job
+    whisper_beam_size: int = 5
+
+    # --- Analysis proxy (low-res copy used for scene/motion analysis)
+    analysis_proxy_width: int = 320
+    analysis_proxy_fps: int = 10
+    analysis_window_s: float = 0.5
+    # Decoder for the analysis pass. On i5-11400H + RTX 3060 Laptop, CPU decoding of 1080p60 H.264
+    # benchmarked faster (30 s vs 51 s per 10 min) than NVDEC + download; the other is the fallback.
+    analysis_decoder: str = "cpu"  # cpu | nvdec
+    models_path: Path | None = None   # override model cache location (default: <data_dir>/models)
     publishing_enabled: bool = False
 
     cors_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]
@@ -77,6 +95,14 @@ class Settings(BaseSettings):
         return self.data_dir / "cache"
 
     @property
+    def models_dir(self) -> Path:
+        return self.models_path or self.data_dir / "models"
+
+    @property
+    def previews_dir(self) -> Path:
+        return self.data_dir / "previews"
+
+    @property
     def renders_dir(self) -> Path:
         return self.data_dir / "renders"
 
@@ -86,7 +112,7 @@ class Settings(BaseSettings):
 
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.videos_dir, self.thumbnails_dir, self.logs_dir,
-                  self.cache_dir, self.renders_dir):
+                  self.cache_dir, self.renders_dir, self.models_dir, self.previews_dir):
             d.mkdir(parents=True, exist_ok=True)
 
     def validate_security(self) -> None:

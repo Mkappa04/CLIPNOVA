@@ -1,4 +1,6 @@
 from backend.models.entities import (  # noqa: F401
+    Analysis,
+    AnalysisStatus,
     AuthorizationStatus,
     Clip,
     ClipCategory,

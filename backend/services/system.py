@@ -81,17 +81,21 @@ def _static_info() -> dict:
 
 
 def ai_runtime() -> dict:
-    modules = {name: find_spec(name) is not None
-               for name in ("torch", "faster_whisper", "cv2", "scenedetect")}
-    info: dict = {"modules": modules, "cuda_available": None}
-    if modules["torch"]:
-        try:
-            import torch  # type: ignore
+    from backend.core import gpu
 
-            info["cuda_available"] = bool(torch.cuda.is_available())
-            info["torch_version"] = torch.__version__
-        except Exception as e:  # noqa: BLE001
-            info["torch_error"] = str(e)
+    modules = {name: find_spec(name) is not None
+               for name in ("faster_whisper", "ctranslate2", "cv2", "scenedetect", "numpy")}
+    info: dict = {"modules": modules, "cuda_available": None}
+    if modules["ctranslate2"]:
+        info["cuda_available"] = gpu.cuda_device_count() > 0 and gpu.preload_cuda_libs()
+    s = get_settings()
+    info["whisper"] = {"gpu_model": s.whisper_model, "cpu_model": s.whisper_cpu_model,
+                       "gpu_compute": s.whisper_compute_type_gpu, "min_free_vram_mb": s.whisper_min_free_vram_mb,
+                       "keep_loaded": s.whisper_keep_loaded,
+                       "cached_models": sorted(p.name.replace("models--Systran--faster-", "").replace(
+                           "models--mobiuslabsgmbh--faster-whisper-", "").replace("models--", "")
+                           for p in (s.models_dir / "whisper").glob("models--*"))
+                       if (s.models_dir / "whisper").exists() else []}
     return info
 
 

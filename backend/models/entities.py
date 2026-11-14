@@ -122,6 +122,9 @@ class Video(Base):
         back_populates="video", uselist=False, cascade="all, delete-orphan", lazy="joined"
     )
     clips: Mapped[list[Clip]] = relationship(back_populates="video", cascade="all, delete-orphan")
+    analysis: Mapped[Analysis | None] = relationship(
+        back_populates="video", uselist=False, cascade="all, delete-orphan"
+    )
 
     @property
     def is_managed_file(self) -> bool:
@@ -167,6 +170,13 @@ class Clip(Base):
     reason: Mapped[str] = mapped_column(Text, default="")
     suggested_title: Mapped[str] = mapped_column(String(300), default="")
     status: Mapped[str] = mapped_column(String(20), default=ClipStatus.DETECTED.value, index=True)
+    origin: Mapped[str] = mapped_column(String(10), default="auto")  # auto | manual
+    peak_time: Mapped[float | None] = mapped_column(Float, nullable=True)
+    language: Mapped[str] = mapped_column(String(8), default="")
+    signals: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    category_scores: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
+    preview_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -175,6 +185,35 @@ class Clip(Base):
     @property
     def duration(self) -> float:
         return max(0.0, self.end - self.start)
+
+
+class AnalysisStatus(str, Enum):
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class Analysis(Base):
+    """Result of the analysis pipeline for one video (cached artefacts live in data/cache/<video_id>)."""
+
+    __tablename__ = "analyses"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    video_id: Mapped[str] = mapped_column(ForeignKey("videos.id", ondelete="CASCADE"), unique=True)
+    status: Mapped[str] = mapped_column(String(20), default=AnalysisStatus.RUNNING.value)
+    language: Mapped[str] = mapped_column(String(8), default="")
+    transcription_device: Mapped[str] = mapped_column(String(10), default="")
+    whisper_model: Mapped[str] = mapped_column(String(60), default="")
+    transcript_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    timeline_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    scenes: Mapped[list[float]] = mapped_column(JSON, default=list)
+    stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    video: Mapped[Video] = relationship(back_populates="analysis")
 
 
 class Job(Base):

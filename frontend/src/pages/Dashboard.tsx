@@ -47,7 +47,7 @@ export function Dashboard() {
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <Stat label="Video importati" value={data.videos.total} icon={<Film size={16} />}
               sub={`${formatDuration(data.videos.total_duration)} di girato · ${data.videos.ready} pronti`} />
-            <Stat label="Clip generate" value={data.clips.total} icon={<ScanSearch size={16} />} accent="cyan" sub="Clip detection: Milestone 2" />
+            <Stat label="Clip generate" value={data.clips.total} icon={<ScanSearch size={16} />} accent="cyan" sub={<Link to="/detection" className="text-pulse-400 hover:underline">Apri Clip Detection →</Link>} />
             <Stat label="In revisione" value={data.clips.in_review} icon={<Clock size={16} />} accent="cyan" />
             <Stat label="Approvate" value={data.clips.approved} icon={<CheckCircle2 size={16} />} accent="green" />
             <Stat label="Render completati" value={data.jobs.renders_completed} icon={<Layers size={16} />} />
@@ -66,12 +66,12 @@ export function Dashboard() {
               {PIPELINE.map((step, i) => (
                 <div key={step} className="flex flex-1 items-center gap-1">
                   <div className={`flex-1 rounded-lg px-2 py-2 text-center text-xs font-semibold uppercase tracking-wider ring-1 ${
-                    i < 2 ? 'bg-nova-500/15 text-nova-200 ring-nova-500/40' : 'bg-ink-850 text-zinc-500 ring-ink-700'}`}>{step}</div>
+                    i < 3 ? 'bg-nova-500/15 text-nova-200 ring-nova-500/40' : 'bg-ink-850 text-zinc-500 ring-ink-700'}`}>{step}</div>
                   {i < PIPELINE.length - 1 && <span className="text-zinc-600">›</span>}
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-xs text-zinc-500">Attivi in Milestone 1: Import e Analysis (metadati). La pubblicazione è disabilitata e richiederà sempre approvazione esplicita.</p>
+            <p className="mt-2 text-xs text-zinc-500">Attivi: Import, Analysis e Clip Detection (Milestone 2). La pubblicazione è disabilitata e richiederà sempre approvazione esplicita.</p>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">

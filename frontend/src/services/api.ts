@@ -1,4 +1,5 @@
 import type {
+  AnalysisResponse, Clip, ClipCategory, ClipStatus, ScoringConfig,
   AppSettings, DashboardData, ImportResult, Job, Purpose, Rights, RightsDecision, SystemInfo, Video,
 } from '../types'
 
@@ -74,6 +75,23 @@ export const api = {
   jobs: (filters: { status?: string; video_id?: string; limit?: number } = {}) =>
     request<Job[]>(`/api/jobs${qs(filters)}`),
   cancelJob: (id: string) => request<Job>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
+
+  // ---- analysis & clips (Milestone 2)
+  analyze: (videoId: string, body: { language: 'auto' | 'it' | 'en'; transcribe: boolean; force: boolean; scoring?: ScoringConfig }) =>
+    request<{ job_id: string }>(`/api/videos/${videoId}/analyze`, { method: 'POST', body: JSON.stringify(body) }),
+  analysis: (videoId: string) => request<AnalysisResponse>(`/api/videos/${videoId}/analysis`),
+  rescore: (videoId: string, cfg: ScoringConfig) =>
+    request<Clip[]>(`/api/videos/${videoId}/detect`, { method: 'POST', body: JSON.stringify(cfg) }),
+  scoringDefaults: () => request<{ config: ScoringConfig; weights_help: Record<string, string> }>('/api/scoring/defaults'),
+  transcriptUrl: (videoId: string, format: 'srt' | 'txt' | 'json') => `/api/videos/${videoId}/transcript?format=${format}`,
+  clips: (filters: { video_id?: string; category?: string; status?: string; sort?: string } = {}) =>
+    request<Clip[]>(`/api/clips${qs(filters)}`),
+  updateClip: (id: string, body: Partial<{ start: number; end: number; category: ClipCategory; suggested_title: string; status: ClipStatus }>) =>
+    request<Clip>(`/api/clips/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  createClip: (videoId: string, body: { start: number; end: number; category: ClipCategory; suggested_title?: string }) =>
+    request<Clip>(`/api/videos/${videoId}/clips`, { method: 'POST', body: JSON.stringify(body) }),
+  deleteClip: (id: string) => request<{ deleted: string }>(`/api/clips/${id}${qs({ confirm: true })}`, { method: 'DELETE' }),
+  previewUrl: (c: Clip) => `/api/clips/${c.id}/preview?v=${c.start}-${c.end}`,
 
   /** Upload with progress (fetch has no upload progress, so XHR). */
   upload(files: File[], meta: UploadMeta, onProgress: (fraction: number) => void,

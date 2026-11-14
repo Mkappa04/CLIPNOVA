@@ -40,6 +40,7 @@ class JobContext:
         self.payload = payload
         self.video_id = video_id
         self._last_write = 0.0
+        self._last_message: str | None = None
 
     @property
     def cancelled(self) -> bool:
@@ -51,9 +52,12 @@ class JobContext:
 
     def progress(self, value: float, message: str | None = None, *, force: bool = False) -> None:
         now = time.monotonic()
-        if not force and now - self._last_write < self._MIN_WRITE_INTERVAL:
+        stage_changed = message is not None and message.split(" (")[0] != (self._last_message or "").split(" (")[0]
+        if not force and not stage_changed and now - self._last_write < self._MIN_WRITE_INTERVAL:
             return
         self._last_write = now
+        if message is not None:
+            self._last_message = message
         with session_scope() as db:
             job = db.get(Job, self.job_id)
             if job is not None:
@@ -187,7 +191,7 @@ class JobManager:
                 job.status = status.value
                 job.result = result
                 job.error = error
-                job.message = message
+                job.message = (result or {}).get("message", message) if status is JobStatus.COMPLETED else message
                 job.finished_at = utcnow()
                 if status is JobStatus.COMPLETED:
                     job.progress = 1.0

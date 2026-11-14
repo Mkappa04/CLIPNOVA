@@ -13,6 +13,12 @@ _TMP = Path(os.environ.get("CLIPNOVA_TEST_TMP", "/tmp")) / f"clipnova-test-{os.g
 os.environ["CLIPNOVA_DATA_DIR"] = str(_TMP / "data")
 os.environ["CLIPNOVA_LOG_LEVEL"] = "WARNING"
 os.environ.pop("CLIPNOVA_DATABASE_URL", None)
+# Small Whisper models + shared model cache so tests don't re-download weights
+os.environ["CLIPNOVA_WHISPER_MODEL"] = "tiny"
+os.environ["CLIPNOVA_WHISPER_CPU_MODEL"] = "tiny"
+os.environ["CLIPNOVA_MODELS_PATH"] = str(Path(__file__).resolve().parents[1] / "data" / "models")
+
+DATA = Path(__file__).parent / "data"
 
 
 @pytest.fixture(scope="session")
@@ -38,6 +44,15 @@ def sample_video(media_dir: Path) -> Path:
 
 
 @pytest.fixture(scope="session")
+def gameplay_video(media_dir: Path) -> Path:
+    """60 s synthetic gameplay: cuts at 20/35 s, English speech at 25 s, loud burst at 45 s."""
+    out = media_dir / "gameplay.mp4"
+    script = Path(__file__).resolve().parents[1] / "scripts" / "make_test_gameplay.sh"
+    subprocess.run(["bash", str(script), str(DATA / "jfk.flac"), str(out)], check=True)
+    return out
+
+
+@pytest.fixture(scope="session")
 def client():
     from fastapi.testclient import TestClient
 
@@ -47,7 +62,7 @@ def client():
         yield c
 
 
-def wait_job(client, job_id: str, timeout: float = 30) -> dict:
+def wait_job(client, job_id: str, timeout: float = 180) -> dict:
     deadline = time.time() + timeout
     while time.time() < deadline:
         job = client.get(f"/api/jobs/{job_id}").json()
