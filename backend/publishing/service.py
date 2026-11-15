@@ -46,7 +46,7 @@ def preflight(pub: Publication) -> str | None:
         return f"Clip is no longer approved (status: {pub.clip.status})"
     decision = evaluate(pub.clip.video.rights, Purpose(pub.export.purpose))
     if not decision.allowed:
-        return "Rights check failed: " + "; ".join(decision.blockers)
+        return "Verifica diritti non superata: " + "; ".join(decision.blockers)
     video = _export_video(pub)
     if video is None:
         return "Export package video is missing"

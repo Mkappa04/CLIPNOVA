@@ -21,7 +21,7 @@ export const NAV = [
   { to: '/published', label: 'Published Content', icon: Rocket },
   { to: '/discovery', label: 'Discovery', icon: Compass },
   { to: '/creators', label: 'Creators', icon: Users },
-  { to: '/analytics', label: 'Analytics', icon: BarChart3, milestone: 5 },
+  { to: '/analytics', label: 'Analytics', icon: BarChart3 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ] as const
 
@@ -58,7 +58,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   const nav = (
     <nav className="flex flex-col gap-1">
-      {NAV.map(({ to, label, icon: Icon, ...rest }) => (
+      {NAV.map(({ to, label, icon: Icon }) => (
         <NavLink key={to} to={to} end={to === '/'} onClick={() => setOpen(false)}
           className={({ isActive }) => cx(
             'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition',
@@ -67,7 +67,6 @@ export function Layout({ children }: { children: ReactNode }) {
           )}>
           <Icon size={17} className="shrink-0" />
           <span className="flex-1 truncate">{label}</span>
-          {'milestone' in rest && <span className="rounded bg-ink-700 px-1.5 text-[10px] text-zinc-500">M{rest.milestone}</span>}
         </NavLink>
       ))}
     </nav>

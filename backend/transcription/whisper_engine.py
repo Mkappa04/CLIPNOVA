@@ -217,16 +217,104 @@ def to_srt(t: Transcript) -> str:
 engine = WhisperEngine()
 
 
-# ---------------------------------------------------------------- process isolation
-def _worker(audio: str, language: str | None, duration: float | None, out_path: str, force_device: str | None,
-            q) -> None:  # pragma: no cover - runs in a child process
-    try:
-        def progress(frac: float, msg: str) -> None:
-            q.put(("progress", frac, msg))
+# ---------------------------------------------------------------- process isolation + chunking
+CHUNK_TARGET_S = 45.0
+CHUNK_SEARCH_S = 6.0
+MAX_GPU_RESTARTS = 8
 
-        result = engine.transcribe(Path(audio), language=language, duration=duration, on_progress=progress,
-                                   force_device=force_device)
-        Path(out_path).write_text(_json.dumps(result.to_dict(), ensure_ascii=False))
+
+def plan_chunks(wav: Path, target_s: float = CHUNK_TARGET_S, search_s: float = CHUNK_SEARCH_S) -> list[tuple[float, float]]:
+    """Split the audio into ~target_s chunks, cutting at the quietest point near each boundary."""
+    import wave
+
+    import numpy as np
+
+    with wave.open(str(wav), "rb") as wf:
+        sr, n = wf.getframerate(), wf.getnframes()
+        hop = int(sr * 0.25)
+        levels = []
+        while True:
+            raw = wf.readframes(hop * 400)
+            if not raw:
+                break
+            x = np.frombuffer(raw, dtype=np.int16).astype(np.float32)
+            usable = (len(x) // hop) * hop
+            if usable:
+                levels.extend(np.sqrt((x[:usable].reshape(-1, hop) ** 2).mean(axis=1)).tolist())
+    duration = n / sr
+    if duration <= target_s * 1.5:
+        return [(0.0, duration)]
+    cuts, t = [0.0], target_s
+    while t < duration - target_s * 0.5:
+        lo, hi = int((t - search_s) / 0.25), int((t + search_s) / 0.25)
+        window = levels[max(0, lo):min(len(levels), hi)]
+        best = (max(0, lo) + int(np.argmin(window))) * 0.25 if window else t
+        cuts.append(round(best, 2))
+        t = best + target_s
+    cuts.append(duration)
+    return list(zip(cuts[:-1], cuts[1:]))
+
+
+def _read_slice(wav: Path, start: float, end: float):
+    import wave
+
+    import numpy as np
+
+    with wave.open(str(wav), "rb") as wf:
+        sr = wf.getframerate()
+        wf.setpos(int(start * sr))
+        raw = wf.readframes(int((end - start) * sr))
+    return np.frombuffer(raw, dtype=np.int16).astype(np.float32) / 32768.0
+
+
+def _die_with_parent() -> None:
+    """Linux: terminate this worker if the server process dies (no orphaned GPU workers)."""
+    try:
+        import ctypes
+        import signal
+
+        ctypes.CDLL("libc.so.6").prctl(1, signal.SIGTERM)  # PR_SET_PDEATHSIG
+    except OSError:
+        pass
+
+
+def _chunk_worker(audio: str, chunks: list, start_idx: int, language: str | None, force_device: str | None,
+                  only_one: bool, q) -> None:  # pragma: no cover - runs in a child process
+    _die_with_parent()
+    try:
+        s = get_settings()
+        device, model_name, compute, _ = engine.choose_device()
+        if force_device == "cpu":
+            device, model_name, compute = "cpu", s.whisper_cpu_model, s.whisper_compute_type_cpu
+        q.put(("loading", device, model_name))
+        model = engine._load(model_name, device, compute)
+        crash_marker = os.environ.get("CLIPNOVA_TEST_CRASH_CHUNK")  # test hook: simulate a CUDA abort once
+        for i in range(start_idx, len(chunks)):
+            if crash_marker and device == "cuda" and i == int(crash_marker.split(":")[0]):
+                flag = Path(crash_marker.split(":", 1)[1])
+                if not flag.exists():
+                    flag.write_text("crashed")
+                    os.abort()
+            c0, c1 = chunks[i]
+            segs_iter, info = model.transcribe(
+                _read_slice(Path(audio), c0, c1), language=language, word_timestamps=True,
+                beam_size=s.whisper_beam_size, vad_filter=True, vad_parameters={"min_silence_duration_ms": 500},
+                condition_on_previous_text=False)
+            out, filtered = [], 0
+            for seg in segs_iter:
+                if is_hallucination(seg):
+                    filtered += 1
+                    continue
+                out.append(asdict(Segment(
+                    id=0, start=round(float(seg.start) + c0, 2), end=round(float(seg.end) + c0, 2), text=seg.text.strip(),
+                    avg_logprob=round(float(seg.avg_logprob), 3), no_speech_prob=round(float(seg.no_speech_prob), 3),
+                    words=[Word(round(float(w.start) + c0, 2), round(float(w.end) + c0, 2), w.word,
+                                round(float(w.probability), 3)) for w in (seg.words or [])])))
+            if language is None and out:
+                language = info.language  # keep the detected language for the following chunks
+            q.put(("chunk", i, out, info.language, float(info.language_probability), filtered, device, model_name))
+            if only_one:
+                break
         q.put(("done",))
     except Exception as e:  # noqa: BLE001
         q.put(("error", f"{type(e).__name__}: {e}"))
@@ -236,54 +324,98 @@ def transcribe_isolated(
     audio: Path, *, language: str | None = None, duration: float | None = None,
     on_progress: Callable[[float, str], None] | None = None, should_cancel: Callable[[], bool] | None = None,
 ) -> Transcript:
-    """Run Whisper in a spawned child process.
+    """Chunked, resumable transcription in spawned worker processes.
 
-    When the child exits, the OS reclaims all RAM and VRAM (CUDA contexts and the
-    allocator otherwise keep ~2 GB resident). A CUDA crash cannot take the server
-    down, and cancellation is immediate (the child is terminated).
+    - The worker exits after the job → the OS reclaims all RAM/VRAM.
+    - The audio is split at quiet points into ~45 s chunks. If the GPU worker crashes (CUDA errors kill
+      the whole process), a new GPU worker resumes from the failed chunk; a chunk that crashes twice is
+      done on CPU, then the GPU continues. Only after MAX_GPU_RESTARTS crashes the rest goes to CPU.
     """
     import multiprocessing as mp
     import queue as _queue
-    import tempfile
 
+    t0 = time.monotonic()
+    audio = Path(audio).resolve()  # workers may not share our notion of the working directory
+    chunks = plan_chunks(audio)
+    total = len(chunks)
+    results: dict[int, list[dict]] = {}
+    lang, lang_prob, filtered = language, 0.0, 0
+    devices, models = set(), set()
+    gpu_crashes = 0
+    crashes_per_chunk: dict[int, int] = {}
     ctx = mp.get_context("spawn")
-    with tempfile.TemporaryDirectory(prefix="clipnova-whisper-") as tmp:
-        out = Path(tmp) / "transcript.json"
-        for force_device in (None, "cpu"):
-            q = ctx.Queue()
-            proc = ctx.Process(target=_worker, args=(str(audio), language, duration, str(out), force_device, q),
-                               daemon=True, name="clipnova-whisper")
-            proc.start()
-            status, error = None, None
-            try:
-                while status is None:
-                    if should_cancel and should_cancel():
-                        proc.terminate()
-                        proc.join(5)
-                        raise TranscriptionCancelled()
-                    try:
-                        msg = q.get(timeout=0.3)
-                    except _queue.Empty:
-                        if not proc.is_alive():
-                            status, error = "crashed", f"worker exited with code {proc.exitcode}"
-                        continue
-                    if msg[0] == "progress" and on_progress:
-                        on_progress(msg[1], msg[2])
-                    elif msg[0] in ("done", "error"):
-                        status, error = msg[0], (msg[1] if msg[0] == "error" else None)
-            finally:
-                proc.join(10)
-                if proc.is_alive():
-                    proc.kill()
-            if status == "done":
-                return Transcript.from_dict(_json.loads(out.read_text()))
-            if status == "crashed" and force_device is None:
-                log.warning("Whisper worker crashed (%s); retrying on CPU", error)
-                if on_progress:
-                    on_progress(0.0, "Worker GPU terminato in modo anomalo, riprovo su CPU")
-                continue
+    next_idx = 0
+    gpu_disabled = False
+
+    while next_idx < total:
+        force_cpu = gpu_disabled or crashes_per_chunk.get(next_idx, 0) >= 2
+        q = ctx.Queue()
+        proc = ctx.Process(target=_chunk_worker, daemon=True, name="clipnova-whisper",
+                           args=(str(audio), chunks, next_idx, lang, "cpu" if force_cpu else None,
+                                 force_cpu and not gpu_disabled, q))
+        proc.start()
+        status, error = None, None
+        try:
+            while status is None:
+                if should_cancel and should_cancel():
+                    proc.terminate()
+                    proc.join(5)
+                    raise TranscriptionCancelled()
+                try:
+                    msg = q.get(timeout=0.3)
+                except _queue.Empty:
+                    if not proc.is_alive():
+                        status, error = "crashed", f"worker exited with code {proc.exitcode}"
+                    continue
+                if msg[0] == "loading" and on_progress:
+                    cached = any((get_settings().models_dir / "whisper").glob(f"models--*{msg[2]}*"))
+                    on_progress(len(results) / total, f"Caricamento modello {msg[2]} ({msg[1]})" if cached else
+                                f"Download modello {msg[2]} (una sola volta, può richiedere qualche minuto)")
+                elif msg[0] == "chunk":
+                    _, i, segs, det_lang, prob, filt, dev, mname = msg
+                    results[i] = segs
+                    filtered += filt
+                    devices.add(dev)
+                    models.add(mname)
+                    if lang is None and segs:
+                        lang, lang_prob = det_lang, prob
+                    elif not lang_prob and det_lang == lang:
+                        lang_prob = prob
+                    next_idx = i + 1
+                    if on_progress:
+                        on_progress(len(results) / total, f"Trascrizione {dev.upper()} blocco {len(results)}/{total}")
+                    if force_cpu and not gpu_disabled:
+                        status = "done"  # the problematic chunk is done on CPU: go back to the GPU
+                elif msg[0] in ("done", "error"):
+                    status, error = msg[0], (msg[1] if msg[0] == "error" else None)
+        finally:
+            proc.join(10)
+            if proc.is_alive():
+                proc.kill()
+        if status == "error":
             raise RuntimeError(f"Transcription failed: {error}")
-    raise RuntimeError("Transcription failed")
+        if status == "crashed":
+            if force_cpu:
+                raise RuntimeError(f"Transcription failed on CPU: {error}")
+            gpu_crashes += 1
+            crashes_per_chunk[next_idx] = crashes_per_chunk.get(next_idx, 0) + 1
+            log.warning("Whisper GPU worker crashed at chunk %d/%d (%s); crash %d", next_idx + 1, total, error, gpu_crashes)
+            if gpu_crashes >= max(MAX_GPU_RESTARTS, total):  # a restart costs seconds, CPU costs minutes
+                gpu_disabled = True
+                log.warning("Too many GPU crashes: finishing the transcription on CPU")
+            if on_progress:
+                on_progress(len(results) / total, f"Errore GPU sul blocco {next_idx + 1}: riprendo da lì")
+
+    segments: list[Segment] = []
+    for i in range(total):
+        for sd in results.get(i, []):
+            sd["id"] = len(segments)
+            segments.append(Segment(**{**sd, "words": [Word(**w) for w in sd["words"]]}))
+    dur = duration or (chunks[-1][1] if chunks else 0.0)
+    device = "+".join(sorted(devices)) or "cpu"
+    return Transcript(language=lang or "", language_probability=round(lang_prob, 3), duration=round(dur, 2),
+                      device=device, model="+".join(sorted(models)), segments=segments,
+                      elapsed_s=round(time.monotonic() - t0, 1), filtered_segments=filtered)
 
 
 def transcribe(audio: Path, **kwargs) -> Transcript:

@@ -23,6 +23,38 @@ function Panel({ title, icon, children }: { title: string; icon: ReactNode; chil
   )
 }
 
+function Maintenance() {
+  const [scan, setScan] = useState<Record<string, { label: string; bytes: number; count: number }> | null>(null)
+  const [sel, setSel] = useState<string[]>([])
+  const [confirm, setConfirm] = useState(false)
+  const load = () => fetch('/api/maintenance/scan').then((r) => r.json()).then(setScan).catch(() => {})
+  useEffect(() => { void load() }, [])
+  const run = async () => {
+    try {
+      const r = await fetch('/api/maintenance/cleanup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ categories: sel, confirm: true }) }).then((x) => x.json())
+      toast.success(`Liberati ${formatBytes(r.freed_bytes)}${r.skipped?.length ? ` · rimandati: ${r.skipped.join('; ')}` : ''}`)
+      setSel([]); setConfirm(false); void load()
+    } catch (e) { toast.error(e) }
+  }
+  if (!scan) return <Spinner />
+  const total = sel.reduce((a, k) => a + (scan[k]?.bytes ?? 0), 0)
+  return (
+    <div className="space-y-2">
+      {Object.entries(scan).map(([k, v]) => (
+        <label key={k} className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1 accent-nova-500" disabled={!v.count} checked={sel.includes(k)}
+                 onChange={(e) => setSel(e.target.checked ? [...sel, k] : sel.filter((x) => x !== k))} />
+          <span className="flex-1 text-zinc-300">{v.label}</span>
+          <span className="font-mono text-xs text-zinc-400">{v.count ? formatBytes(v.bytes) : '—'}</span>
+        </label>
+      ))}
+      <p className="text-xs text-zinc-500">Non vengono mai toccati: video in libreria, file originali, render ed export registrati, credenziali, prove dei consensi.</p>
+      {!confirm ? <button className="btn-ghost" disabled={!sel.length} onClick={() => setConfirm(true)}>Pulisci ({formatBytes(total)})</button>
+        : <span className="flex gap-2"><button className="btn-danger" onClick={run}>Conferma eliminazione</button><button className="btn-ghost" onClick={() => setConfirm(false)}>Annulla</button></span>}
+    </div>
+  )
+}
+
 function DiscoveryKeys() {
   const [keys, setKeys] = useState<Record<string, Record<string, string>>>({})
   const [edit, setEdit] = useState<Record<string, string>>({})
@@ -113,6 +145,7 @@ export function Settings() {
           </Panel>
 
           <Panel title="Scoperta contenuti (API gratuite)" icon={<Sparkles size={18} />}><DiscoveryKeys /></Panel>
+          <Panel title="Manutenzione spazio" icon={<HardDrive size={18} />}><Maintenance /></Panel>
 
           {cfg && (
             <Panel title="Configurazione" icon={<Cpu size={18} />}>

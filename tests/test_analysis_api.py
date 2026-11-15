@@ -139,3 +139,36 @@ def test_isolated_worker_transcribes_and_cancels(media_dir):
 
     with pytest.raises(TranscriptionCancelled):
         transcribe_isolated(wav, should_cancel=lambda: True)
+
+
+def test_chunk_planner_cuts_at_quiet_points(media_dir):
+    from backend.transcription.whisper_engine import plan_chunks
+
+    wav = media_dir / "chunks.wav"
+    # 100 s of tone with a silent gap at 40-42 s: the first cut must land in the gap
+    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                    "sine=frequency=300:duration=100:sample_rate=16000",
+                    "-af", "volume=enable='between(t,40,42)':volume=0", "-ac", "1", str(wav)], check=True)
+    chunks = plan_chunks(wav, target_s=45, search_s=6)
+    assert 40 <= chunks[0][1] <= 42
+    assert chunks[-1][1] == pytest.approx(100, abs=0.1)
+    assert all(a < b for a, b in chunks) and all(chunks[i][1] == chunks[i + 1][0] for i in range(len(chunks) - 1))
+
+
+def test_gpu_crash_resumes_from_failed_chunk(media_dir, monkeypatch):
+    """A CUDA abort kills the worker: a new worker resumes from that chunk, nothing is lost."""
+    from backend.transcription.whisper_engine import transcribe_isolated
+    from tests.conftest import DATA
+
+    wav = media_dir / "jfk_x10.wav"
+    subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-stream_loop", "9", "-i",
+                    str(DATA / "jfk.flac"), "-ac", "1", "-ar", "16000", str(wav)], check=True)
+    flag = media_dir / "crash_once.flag"
+    flag.unlink(missing_ok=True)
+    monkeypatch.setenv("CLIPNOVA_TEST_CRASH_CHUNK", f"1:{flag}")
+    events = []
+    t = transcribe_isolated(wav, on_progress=lambda f, m: events.append(m))
+    text = t.text.lower()
+    assert text.count("country") >= 8  # all ten repetitions (minus chunk-edge cuts) transcribed
+    if "cuda" in t.device:  # the crash hook only fires on the GPU
+        assert flag.exists() and any("Errore GPU sul blocco 2" in e for e in events)

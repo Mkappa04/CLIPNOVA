@@ -16,7 +16,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.routers import (
-    analysis, approval, automation, clips, creators, discovery, editing, jobs, publishing, system, videos,
+    analysis, analytics, approval, automation, clips, creators, discovery, editing, jobs, publishing, system,
+    videos,
 )
 from backend.core.config import PROJECT_ROOT, get_settings
 from backend.core.exceptions import ClipnovaError
@@ -83,6 +84,7 @@ def create_app() -> FastAPI:
     app.include_router(automation.router)
     app.include_router(discovery.router)
     app.include_router(creators.router)
+    app.include_router(analytics.router)
 
     _mount_frontend(app)
     return app

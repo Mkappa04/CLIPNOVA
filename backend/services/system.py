@@ -22,14 +22,38 @@ def _read(path: str) -> str:
 
 
 def dir_size(path: Path) -> int:
+    """Real disk usage: symlinks are not followed (the Hugging Face cache links snapshots to blobs,
+    following them counted the Whisper models twice) and hard links are counted once."""
     total = 0
+    seen: set[tuple[int, int]] = set()
     for root, _dirs, files in os.walk(path):
         for f in files:
             try:
-                total += (Path(root) / f).stat().st_size
+                st = (Path(root) / f).lstat()
             except OSError:
-                pass
+                continue
+            if os.path.stat.S_ISLNK(st.st_mode) or (st.st_dev, st.st_ino) in seen:
+                continue
+            seen.add((st.st_dev, st.st_ino))
+            total += st.st_size
     return total
+
+
+_size_cache: dict[str, tuple[float, int]] = {}
+
+
+def dir_size_cached(path: Path, ttl: float = 60.0) -> int:
+    """dir_size with a short cache: the dashboard polls every few seconds and data/ can hold many GB."""
+    import time
+
+    key = str(path)
+    hit = _size_cache.get(key)
+    now = time.monotonic()
+    if hit and now - hit[0] < ttl:
+        return hit[1]
+    size = dir_size(path)
+    _size_cache[key] = (now, size)
+    return size
 
 
 def _meminfo() -> dict:
@@ -106,7 +130,7 @@ def system_info() -> dict:
         **_static_info(),
         "memory": _meminfo(),
         "disk": {"total": disk.total, "used": disk.used, "free": disk.free,
-                 "data_dir": str(s.data_dir), "data_dir_bytes": dir_size(s.data_dir)},
+                 "data_dir": str(s.data_dir), "data_dir_bytes": dir_size_cached(s.data_dir)},
         "gpu": gpu_info(),
         "ffmpeg": ffmpeg.capabilities(),
         "ai": ai_runtime(),

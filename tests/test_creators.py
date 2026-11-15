@@ -64,7 +64,7 @@ def test_creator_folder_import_prefills_rights_and_expiry_blocks(client, tmp_pat
     assert rights["attribution_text"] == "Credit: @creatorfolder" and rights["expires_at"] == str(expires)
     assert not rights["commercial_use_allowed"] and "VOD GTA 6" in rights["evidence"]
     check = client.get(f"/api/videos/{f['video_id']}/rights/check", params={"purpose": "non_commercial"}).json()
-    assert check["allowed"] and any("expires soon" in w for w in check["warnings"])
+    assert check["allowed"] and any("scade a breve" in w for w in check["warnings"])
 
     client.post("/api/notifications/read")
     with session_scope() as db:   # 5 days before expiry: warning (the watcher's hourly check may have sent it already)

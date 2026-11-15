@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "CLIPNOVA"
-    version: str = "0.1.0"
+    version: str = "1.0.0"
 
     host: str = "127.0.0.1"
     port: int = 8000

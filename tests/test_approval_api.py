@@ -136,7 +136,7 @@ def test_publishing_guards_and_flow(client, rendered, monkeypatch):
     client.put(f"/api/videos/{vid}/rights", json={**AUTHORIZED, "expires_at": str(date.today() - timedelta(days=1))})
     assert service.publish_now(pub2["id"]) == "failed"
     p2 = [x for x in client.get("/api/publishing/publications").json() if x["id"] == pub2["id"]][0]
-    assert "Rights check failed" in p2["last_error"]
+    assert "Verifica diritti non superata" in p2["last_error"]
 
     # the scheduler only dispatches when enabled
     monkeypatch.setattr(get_settings(), "publishing_enabled", False)

@@ -97,16 +97,15 @@ def _cleanup_tmp():
 @pytest.fixture(autouse=True)
 def _reset_automation_settings():
     """Automation settings live in the shared test DB: start every test unpaused, no window, no idle gating."""
-    try:
-        from backend.database.session import session_scope
+    from backend.database import session as dbs
+
+    if dbs._engine is not None:  # only once the app (and its DB) has been started by the client fixture
         from backend.models.automation_entities import AppSetting
 
-        with session_scope() as db:
+        with dbs.session_scope() as db:
             row = db.get(AppSetting, "automation")
             if row is not None:
                 db.delete(row)
-    except RuntimeError:  # engine not initialised (pure unit tests)
-        pass
     yield
 
 

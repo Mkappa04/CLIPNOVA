@@ -80,7 +80,34 @@ def dashboard(db: Session = Depends(get_db)) -> dict:
             "failed": count(Job, Job.status == JobStatus.FAILED.value),
             "renders_completed": count(Job, Job.type.like("render.%"), Job.status == JobStatus.COMPLETED.value),
         },
-        "storage": {"data_bytes": system.dir_size(s.data_dir), "disk_free": disk.free, "disk_total": disk.total},
+        "storage": {"data_bytes": system.dir_size_cached(s.data_dir), "disk_free": disk.free, "disk_total": disk.total},
         "recent_videos": [video_service.to_out(db, v).model_dump(mode="json") for v in recent_videos],
         "recent_jobs": [JobOut.model_validate(j).model_dump(mode="json") for j in recent_jobs],
     }
+
+
+# ---------------------------------------------------------------- maintenance (Milestone 5)
+from pydantic import BaseModel  # noqa: E402
+
+from backend.core.exceptions import ValidationFailed  # noqa: E402
+from backend.services import maintenance  # noqa: E402
+
+
+@router.get("/maintenance/scan")
+def maintenance_scan(db: Session = Depends(get_db)) -> dict:
+    found = maintenance.scan(db)
+    return {k: {kk: vv for kk, vv in v.items() if kk != "items"} | {"examples": v["items"][:5]} for k, v in found.items()}
+
+
+class CleanupIn(BaseModel):
+    categories: list[str]
+    confirm: bool = False
+
+
+@router.post("/maintenance/cleanup")
+def maintenance_cleanup(body: CleanupIn, db: Session = Depends(get_db)) -> dict:
+    if not body.confirm:
+        raise ValidationFailed("La pulizia elimina file: conferma richiesta (confirm=true)", code="confirmation_required")
+    result = maintenance.cleanup(db, body.categories)
+    db.commit()
+    return result

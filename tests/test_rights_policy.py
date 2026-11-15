@@ -30,7 +30,7 @@ def test_fully_authorized_commercial_allowed():
 def test_credit_only_is_not_authorization():
     d = evaluate(rec(license_type="credit_only"), Purpose.NON_COMMERCIAL)
     assert not d.allowed
-    assert any("not an authorization" in b for b in d.blockers)
+    assert any("non è un'autorizzazione" in b for b in d.blockers)
 
 
 def test_unknown_license_and_pending_status_block():
@@ -54,7 +54,7 @@ def test_expired_blocks_and_soon_warns():
     today = date(2026, 11, 14)
     assert not evaluate(rec(expires_at=today - timedelta(days=1)), Purpose.NON_COMMERCIAL, today).allowed
     d = evaluate(rec(expires_at=today + timedelta(days=3)), Purpose.NON_COMMERCIAL, today)
-    assert d.allowed and any("expires soon" in w for w in d.warnings)
+    assert d.allowed and any("scade a breve" in w for w in d.warnings)
 
 
 def test_attribution_text_required_when_needed():

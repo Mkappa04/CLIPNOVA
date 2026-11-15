@@ -4,12 +4,15 @@ Piattaforma **locale** per trasformare registrazioni gaming autorizzate in conte
 (TikTok, Instagram Reels, YouTube Shorts). Gira interamente dentro **Ubuntu su WSL 2**, budget 0 €,
 nessun servizio cloud obbligatorio. Primo gioco supportato: **GTA 6**, ma è indipendente dal gioco.
 
-> Stato: **Milestone 4** completata. M1: import, libreria, diritti, job queue, dashboard.
+> **Versione 1.0.0 — release locale** (Milestone 5). Guida d'uso: [docs/USER_GUIDE.md](docs/USER_GUIDE.md) ·
+> novità: [CHANGELOG.md](CHANGELOG.md).
+>
+> Milestone completate: M1: import, libreria, diritti, job queue, dashboard.
 > M2: analisi, trascrizione faster-whisper (GPU), clip detection con scoring configurabile.
 > M3: editor automatico 9:16, layout gameplay/webcam, smart crop, zoom, sottotitoli ASS animati, rendering NVENC.
 > M4: approvazione, gestione diritti nell'export, export manuale assistito, architettura di pubblicazione (API ufficiali).
 > M4B: import automatico da cartelle monitorate, scoperta contenuti via API ufficiali, CRM permessi dei creator.
-> Release locale (M5) in roadmap.
+> M5: Analytics, trascrizione a blocchi ripristinabile, manutenzione spazio, backup, diagnostica, release.
 
 ## Requisiti
 
@@ -231,6 +234,22 @@ Server durante il render: ~330 MB di RAM. Anteprima fotogramma: < 1 s.
 Tutto in `.env` (vedi `.env.example`), variabili con prefisso `CLIPNOVA_`.
 Il server rifiuta di mettersi in ascolto su indirizzi diversi da localhost a meno di
 `CLIPNOVA_ALLOW_PUBLIC_BIND=true`.
+
+## Funzionalità (Milestone 5): release locale
+
+- **Analytics** (`/analytics`): produzione giornaliera, workflow, categorie, distribuzione degli score, prestazioni,
+  import automatico, spazio su disco.
+- **Trascrizione GPU robusta**: blocchi da ~45 s tagliati nei silenzi; un crash CUDA fa ripartire il worker GPU dal
+  blocco fallito (vedi *Note tecniche*). Il server non viene mai abbattuto da un crash del modello.
+- **Manutenzione spazio** in Settings, **backup** (`scripts/backup.sh`), **diagnostica** (`scripts/doctor.sh`),
+  servizio systemd opzionale (`scripts/install-service.sh`).
+
+### Note tecniche: crash CUDA della trascrizione
+Su questo PC (RTX 3060 Laptop, driver Windows 610.74, WSL 2) CTranslate2 va in errore CUDA
+(`cudaErrorIllegalAddress` / `IllegalInstruction`) dopo decine di secondi di inferenza continua su audio reale,
+in modo casuale, con qualunque modello e precisione (anche CTranslate2 4.6). FFmpeg/NVENC e i campioni brevi non ne
+risentono. La trascrizione a blocchi rende il problema innocuo (10 min di audio in 202 s con 5 crash). Probabili
+cause da verificare: driver NVIDIA di Windows o librerie CUDA 12.9 / cuDNN 9.28 installate via pip.
 
 ## Test
 

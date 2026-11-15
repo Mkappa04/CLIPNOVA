@@ -47,41 +47,41 @@ def evaluate(rights: RightsRecord | None, purpose: Purpose, today: date | None =
     warnings: list[str] = []
 
     if rights is None:
-        return RightsDecision(purpose, False, ["No rights record: register owner, license and authorization first."])
+        return RightsDecision(purpose, False, ["Nessun dato sui diritti: registra proprietario, licenza e autorizzazione."])
 
     license_type = LicenseType(rights.license_type)
     auth = AuthorizationStatus(rights.authorization_status)
 
     if license_type is LicenseType.CREDIT_ONLY:
-        blockers.append("Credit/attribution alone is not an authorization to reuse the content.")
+        blockers.append("Il solo credito/attribuzione non è un'autorizzazione a riutilizzare il contenuto.")
     if license_type is LicenseType.UNKNOWN:
-        blockers.append("License type is unknown.")
+        blockers.append("Tipo di licenza sconosciuto.")
 
     if auth is not AuthorizationStatus.AUTHORIZED:
-        blockers.append(f"Authorization status is '{auth.value}', must be 'authorized'.")
+        blockers.append(f"Stato autorizzazione «{auth.value}»: deve essere «authorized».")
 
     if rights.expires_at is not None and rights.expires_at < today:
-        blockers.append(f"Authorization expired on {rights.expires_at.isoformat()}.")
+        blockers.append(f"Autorizzazione scaduta il {rights.expires_at.isoformat()}.")
     elif rights.expires_at is not None and (rights.expires_at - today).days <= 7:
-        warnings.append(f"Authorization expires soon ({rights.expires_at.isoformat()}).")
+        warnings.append(f"L'autorizzazione scade a breve ({rights.expires_at.isoformat()}).")
 
     if purpose is Purpose.COMMERCIAL:
         if license_type in _NON_COMMERCIAL_ONLY_LICENSES:
-            blockers.append("License forbids commercial use (NC).")
+            blockers.append("La licenza vieta l'uso commerciale (NC).")
         if not rights.commercial_use_allowed:
-            blockers.append("Commercial use is not marked as allowed.")
+            blockers.append("L'uso commerciale non è indicato come consentito.")
 
     needs_attribution = rights.attribution_required or license_type in _ATTRIBUTION_LICENSES
     if needs_attribution and not rights.attribution_text.strip():
-        blockers.append("Attribution is required but no attribution text is set.")
+        blockers.append("Attribuzione richiesta ma manca il testo di attribuzione.")
 
     if license_type in (LicenseType.CREATOR_PERMISSION, LicenseType.LICENSED) and not rights.evidence.strip():
-        warnings.append("No evidence of permission recorded (e-mail, contract, link).")
+        warnings.append("Nessuna prova del permesso registrata (email, contratto, link).")
 
     if rights.restrictions.strip():
-        warnings.append(f"Restrictions apply, review manually: {rights.restrictions.strip()}")
+        warnings.append(f"Ci sono restrizioni, verifica a mano: {rights.restrictions.strip()}")
 
     if license_type is LicenseType.OWN_CONTENT:
-        warnings.append("Own gameplay may still be subject to the publisher's content policy (e.g. Rockstar).")
+        warnings.append("Il gameplay proprio resta soggetto alla policy dell'editore sui contenuti (es. Rockstar).")
 
     return RightsDecision(purpose, not blockers, blockers, warnings)
