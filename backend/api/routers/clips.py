@@ -109,8 +109,11 @@ def delete_clip(clip_id: str, confirm: bool = False, db: Session = Depends(get_d
     if not confirm:
         raise ValidationFailed("Deletion requires explicit confirmation (confirm=true)", code="confirmation_required")
     clip = _get(db, clip_id)
+    if clip.status == "rendering":
+        raise ValidationFailed("Clip is rendering: cancel the render first")
     if clip.preview_path:
         Path(clip.preview_path).unlink(missing_ok=True)
+    vs.remove_render_dirs(clip)
     db.delete(clip)
     db.commit()
     return {"deleted": clip_id}

@@ -27,7 +27,7 @@ e sono annullabili.
 | Import, metadati, thumbnail | 1 ✅ | `services/video_service.py`, `workers/handlers.py` |
 | Diritti e policy di export | 1 ✅ (policy) / 4 (enforcement export) | `rights_management/policy.py` |
 | Scene/audio/trascrizione, scoring | 2 ✅ | `clip_detection/`, `transcription/` |
-| Editing 9:16, layout, sottotitoli, render | 3 | `editing/`, `subtitles/` |
+| Editing 9:16, layout, sottotitoli, render | 3 ✅ | `editing/`, `subtitles/` |
 | Revisione, approvazione, export, publishing | 4 | `publishing/` |
 
 ## Job queue (`backend/workers/queue.py`)
@@ -85,6 +85,30 @@ CUDA se presente, librerie cuBLAS/cuDNN caricate (wheel pip, preload `ctypes`) e
 Filtro allucinazioni: frasi tipiche ("Sottotitoli a cura di QTSS", "thanks for watching"…) e segmenti con
 `no_speech_prob > 0,6` e `avg_logprob < −1`.
 
+## Rendering (Milestone 3)
+
+```
+ffmpeg decode (-ss, fps, ≤1920 px, rawvideo BGR) ─▶ Compositor (NumPy/OpenCV) ─▶ ffmpeg encode
+                                                     layout · smart crop · zoom      ass (libass, fontsdir=assets/fonts)
+                                                     webcam · transizioni · intro     audio: aselect (tagli) → highpass →
+                                                                                      [afftdn] → acompressor → loudnorm ×2
+                                                                                      → h264_nvenc | libx264 + AAC
+```
+
+- Il compositing in Python invece che in un filtergraph FFmpeg permette crop/zoom/layout variabili frame per frame
+  (lo split dinamico cambia le dimensioni dei riquadri) senza deformazioni: ogni area è riempita con un crop dello
+  stesso aspect ratio (`warpAffine` sub-pixel) o con *fit* su sfondo sfocato.
+- **Timeline di output** (`editing/timeline.py`): segmenti mantenuti quantizzati sulla griglia dei frame, così video
+  (frame scartati in Python) e audio (`aselect`) tagliano nello stesso istante; i sottotitoli vengono rimappati.
+- **Smart crop** (`editing/reframe.py`): centroide del movimento per frame sul proxy di analisi (webcam mascherata),
+  poi camera virtuale con zona morta (5%), velocità massima (22% della larghezza al secondo) e smoothing gaussiano.
+- **Webcam** (`editing/webcam.py`): 24 fotogrammi via seek; YuNet; voto su griglia 16×9 della posizione dei volti
+  (persistenza ≥ 35%); bordi = linee più forti e persistenti più vicine al volto, misurate su bande larghe e raffinate
+  alternando orizzontale/verticale. Fallback: selezione manuale.
+- **Loudness**: primo passaggio solo audio con `loudnorm print_format=json`, secondo passaggio lineare con i valori
+  misurati (risultato verificato: −14,1 LUFS).
+- Ogni render produce `data/renders/<render_id>/` con `clip.mp4`, `subtitles.ass`, `subtitles.srt`, `thumb.jpg`.
+
 ## Migrazioni
 
 Alembic (`backend/database/migrations`). All'avvio `init_db()` applica `upgrade head`; un DB creato dalla
@@ -93,4 +117,5 @@ Milestone 1 (senza `alembic_version`) viene prima marcato alla baseline `0001`. 
 
 ## Schema DB
 
-`videos` 1─1 `rights_records`, `videos` 1─1 `analyses`, `videos` 1─N `clips`, `jobs` (N─1 opzionale su `videos`).
+`videos` 1─1 `rights_records`, `videos` 1─1 `analyses`, `videos` 1─N `clips` 1─N `renders`, `jobs` (N─1 opzionale su `videos`).
+`videos.webcam_region`, `clips.edit_config`, `clips.subtitles` sono JSON (migrazione `0003`).

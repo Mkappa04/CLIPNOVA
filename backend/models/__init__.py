@@ -8,6 +8,8 @@ from backend.models.entities import (  # noqa: F401
     Job,
     JobStatus,
     LicenseType,
+    Render,
+    RenderStatus,
     RightsRecord,
     StorageMode,
     Video,

@@ -1,4 +1,5 @@
-import { Archive, Check, Minus, Plus, RotateCcw, Save, Trash2, X } from 'lucide-react'
+import { Archive, Check, Clapperboard, Minus, Plus, RotateCcw, Save, Trash2, X } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { api } from '../services/api'
 import { CATEGORIES, SIGNAL_LABELS, formatTime } from '../services/format'
@@ -90,7 +91,8 @@ export function ClipInspector({ clip, onChanged, onDeleted }: { clip: Clip; onCh
       <div className="flex flex-wrap gap-2">
         <button className="btn-primary" disabled={!dirty || busy} onClick={() => save()}><Save size={15} /> Salva</button>
         {dirty && <button className="btn-ghost" onClick={() => { setStart(clip.start); setEnd(clip.end); setTitle(clip.suggested_title); setCategory(clip.category) }}><RotateCcw size={15} /> Annulla</button>}
-        <button className="btn-cyan" disabled={busy || clip.status === 'review'} onClick={() => save({ status: 'review' })}><Check size={15} /> In revisione</button>
+        <Link to={`/editor?clip=${clip.id}`} className="btn-cyan"><Clapperboard size={15} /> Apri nell'editor</Link>
+        <button className="btn-ghost" disabled={busy || clip.status === 'review'} onClick={() => save({ status: 'review' })}><Check size={15} /> In revisione</button>
         <button className="btn-ghost" disabled={busy || clip.status === 'rejected'} onClick={() => save({ status: 'rejected' })}><X size={15} /> Scarta</button>
         <button className="btn-ghost" disabled={busy || clip.status === 'archived'} onClick={() => save({ status: 'archived' })}><Archive size={15} /> Archivia</button>
         {clip.status !== 'detected' && <button className="btn-ghost" disabled={busy} onClick={() => save({ status: 'detected' })}><RotateCcw size={15} /> Ripristina</button>}

@@ -1,4 +1,5 @@
 import type {
+  Cue, EditConfig, EditState, Region, RenderItem, SubtitlePreset, WebcamDetection,
   AnalysisResponse, Clip, ClipCategory, ClipStatus, ScoringConfig,
   AppSettings, DashboardData, ImportResult, Job, Purpose, Rights, RightsDecision, SystemInfo, Video,
 } from '../types'
@@ -92,6 +93,40 @@ export const api = {
     request<Clip>(`/api/videos/${videoId}/clips`, { method: 'POST', body: JSON.stringify(body) }),
   deleteClip: (id: string) => request<{ deleted: string }>(`/api/clips/${id}${qs({ confirm: true })}`, { method: 'DELETE' }),
   previewUrl: (c: Clip) => `/api/clips/${c.id}/preview?v=${c.start}-${c.end}`,
+
+  // ---- editing, subtitles, renders (Milestone 3)
+  clip: (id: string) => request<Clip>(`/api/clips/${id}`),
+  editState: (clipId: string) => request<EditState>(`/api/clips/${clipId}/edit`),
+  saveEdit: (clipId: string, cfg: EditConfig) =>
+    request<EditState>(`/api/clips/${clipId}/edit`, { method: 'PUT', body: JSON.stringify(cfg) }),
+  async previewFrame(clipId: string, t: number, config: EditConfig, signal?: AbortSignal): Promise<string> {
+    const res = await fetch(`/api/clips/${clipId}/preview-frame`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ t, config }), signal,
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new ApiError(res.status, body.error ?? 'http_error', body.message ?? res.statusText)
+    }
+    return URL.createObjectURL(await res.blob())
+  },
+  videoFrameUrl: (videoId: string, t: number) => `/api/videos/${videoId}/frame?t=${t.toFixed(2)}`,
+  detectWebcam: (videoId: string) => request<WebcamDetection>(`/api/videos/${videoId}/webcam/detect`, { method: 'POST' }),
+  setWebcam: (videoId: string, region: Region | null) =>
+    request<{ webcam_region: Region | null }>(`/api/videos/${videoId}/webcam`, { method: 'PUT', body: JSON.stringify(region) }),
+  subtitlePresets: () => request<SubtitlePreset[]>('/api/subtitles/presets'),
+  subtitles: (clipId: string) => request<{ cues: Cue[]; edited: boolean; preset: string; duration: number }>(`/api/clips/${clipId}/subtitles`),
+  saveSubtitles: (clipId: string, cues: Cue[]) =>
+    request<{ cues: Cue[]; edited: boolean; preset: string; duration: number }>(`/api/clips/${clipId}/subtitles`, { method: 'PUT', body: JSON.stringify({ cues }) }),
+  resetSubtitles: (clipId: string) =>
+    request<{ cues: Cue[]; edited: boolean; preset: string; duration: number }>(`/api/clips/${clipId}/subtitles${qs({ confirm: true })}`, { method: 'DELETE' }),
+  subtitleExportUrl: (clipId: string, format: 'srt' | 'ass') => `/api/clips/${clipId}/subtitles/export?format=${format}`,
+  render: (clipId: string, config: EditConfig) =>
+    request<{ job_id: string }>(`/api/clips/${clipId}/render`, { method: 'POST', body: JSON.stringify({ config }) }),
+  renders: (filters: { clip_id?: string; status?: string; limit?: number } = {}) => request<RenderItem[]>(`/api/renders${qs(filters)}`),
+  deleteRender: (id: string) => request<{ deleted: string }>(`/api/renders/${id}${qs({ confirm: true })}`, { method: 'DELETE' }),
+  renderFileUrl: (id: string, download = false) => `/api/renders/${id}/file${download ? '?download=true' : ''}`,
+  renderThumbUrl: (id: string) => `/api/renders/${id}/thumbnail`,
+  renderSubsUrl: (id: string, format: 'srt' | 'ass') => `/api/renders/${id}/subtitles?format=${format}`,
 
   /** Upload with progress (fetch has no upload progress, so XHR). */
   upload(files: File[], meta: UploadMeta, onProgress: (fraction: number) => void,

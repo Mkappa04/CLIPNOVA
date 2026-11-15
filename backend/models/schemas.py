@@ -191,4 +191,43 @@ class ClipUpdate(BaseModel):
     end: float | None = Field(default=None, gt=0)
     category: ClipCategory | None = None
     suggested_title: str | None = Field(default=None, max_length=300)
-    status: Literal["detected", "review", "rejected", "archived"] | None = None
+    status: Literal["detected", "review", "rejected", "archived"] | None = None  # 'approved' arrives in M4
+
+
+# ---------------------------------------------------------------- editing & renders (Milestone 3)
+class RenderOut(ORMModel):
+    id: str
+    clip_id: str
+    job_id: str | None
+    status: str
+    duration: float | None
+    file_size: int | None
+    width: int
+    height: int
+    encoder: str
+    config: dict[str, Any]
+    stats: dict[str, Any]
+    error: str | None
+    created_at: UTCDateTime
+    finished_at: UTCDateTime | None
+    clip_title: str = ""
+    video_title: str = ""
+    game: str = ""
+    has_thumbnail: bool = False
+
+
+class SubtitleWord(BaseModel):
+    start: float
+    end: float
+    word: str
+
+
+class SubtitleCue(BaseModel):
+    start: float = Field(ge=0)
+    end: float = Field(gt=0)
+    text: str = Field(max_length=300)
+    words: list[SubtitleWord] = []
+
+
+class SubtitlesIn(BaseModel):
+    cues: list[SubtitleCue]

@@ -4,9 +4,10 @@ Piattaforma **locale** per trasformare registrazioni gaming autorizzate in conte
 (TikTok, Instagram Reels, YouTube Shorts). Gira interamente dentro **Ubuntu su WSL 2**, budget 0 €,
 nessun servizio cloud obbligatorio. Primo gioco supportato: **GTA 6**, ma è indipendente dal gioco.
 
-> Stato: **Milestone 2** completata. M1: import video, libreria, diritti, job queue, dashboard.
-> M2: analisi video/audio, trascrizione faster-whisper (GPU), clip detection con scoring configurabile, anteprime.
-> Editing/sottotitoli/render (M3) e approvazione/export (M4) sono in roadmap.
+> Stato: **Milestone 3** completata. M1: import, libreria, diritti, job queue, dashboard.
+> M2: analisi, trascrizione faster-whisper (GPU), clip detection con scoring configurabile.
+> M3: editor automatico 9:16, layout gameplay/webcam, smart crop, zoom, sottotitoli ASS animati, rendering NVENC.
+> Approvazione/export/publishing (M4) e release (M5) sono in roadmap.
 
 ## Requisiti
 
@@ -90,6 +91,29 @@ titolo suggerito (cita solo frasi realmente pronunciate vicino al picco), segnal
 non capiscono il gioco. Le risate sono rilevate solo quando compaiono nella trascrizione (ahah, haha, [risate]):
 non c'è ancora un classificatore audio di eventi. Senza parlato la confidenza è ridotta del 25%.
 
+## Funzionalità (Milestone 3): editing e rendering
+
+**Clip Editor** (`/editor`) → scegli una clip → configura → *Render*. Output: **MP4 1080×1920, H.264 (NVENC, fallback
+libx264), AAC 48 kHz**, 30 o 60 fps, più sottotitoli `.srt` e `.ass` e una thumbnail.
+
+| Funzione | Dettagli |
+|---|---|
+| Layout | **A** Full · **B** Stack (gameplay sopra, webcam sotto) · **C** PiP (angoli arrotondati, 4 posizioni) · **D** Split dinamico (il gameplay si allarga sui picchi d'azione) |
+| Webcam | rilevamento automatico (volto stabile con YuNet + bordi statici dell'overlay) o **selezione manuale** trascinando sul fotogramma; una scelta manuale non viene mai sovrascritta |
+| Inquadratura | **smart crop** (camera virtuale che segue il movimento, con zona morta e velocità limitata), centrale, o *fit* (frame intero su sfondo sfocato). Mai deformazioni |
+| Zoom | punch-in morbido sul picco della clip e sui forti picchi audio (max 3) |
+| Transizioni | fade in/out, crossfade sui jump cut, intro/outro con titolo su sfondo sfocato |
+| Audio | taglio silenzi (pause silenziose o ogni pausa nel parlato), high-pass, denoise opzionale, compressore, **loudnorm a due passaggi a −14 LUFS** |
+| Sottotitoli | da timestamp per parola, evidenziazione della parola attiva, safe area social, preset **Clean** (Lato), **Gaming** (Anton, pop), **Viral** (Luckiest Guy, bounce); posizione auto (sulla giunzione gameplay/webcam) |
+| Anteprima | fotogramma 9:16 composto lato server con le impostazioni correnti (anche non salvate) |
+
+**Subtitle Editor** (`/subtitles`): modifica testo/tempi riga per riga; se il numero di parole non cambia i tempi per
+parola restano quelli di Whisper, altrimenti vengono ridistribuiti. Export SRT/ASS. Dopo il render la clip passa in
+**review** (workflow `… → RENDERING → REVIEW`). Le emoji vengono rimosse dal testo bruciato (i font non le hanno).
+
+Font inclusi in `assets/fonts` (Anton: SIL OFL; Luckiest Guy: Apache 2.0); modello volti in `assets/models`
+(YuNet, MIT). Licenze accanto ai file.
+
 ### Prestazioni misurate (i5-11400H, RTX 3060 Laptop 6 GB, WSL 2)
 
 | Video | Tempo analisi | Note |
@@ -97,6 +121,13 @@ non c'è ancora un classificatore audio di eventi. Senza parlato la confidenza �
 | 60 s, 720p | ~10 s | |
 | 10 min, 1080p60 | **45 s** | preparazione 33 s, scene 5 s, trascrizione 7 s |
 | Primo avvio | +~90 s | download unico di `large-v3-turbo` (1,6 GB) |
+
+| Render (clip 60 s, sorgente 1080p60, stack + sottotitoli + intro/outro) | Tempo |
+|---|---|
+| 30 fps, qualità standard | **24 s** (2,6× tempo reale) |
+| 60 fps | 45 s (1,4×) |
+
+Server durante il render: ~330 MB di RAM. Anteprima fotogramma: < 1 s.
 
 - VRAM: picco ~1,2 GB durante la trascrizione (limite 6 GB); torna al livello base a fine job
 - RAM: Whisper gira in un **processo separato** per ogni job → il server resta ~250 MB
@@ -131,7 +162,10 @@ backend/            FastAPI app (main.py)
   clip_detection/   media prep, audio, scene/movimento, lessico, scoring, pipeline
   transcription/    faster-whisper (GPU/CPU, processo isolato)
   database/migrations/  migrazioni Alembic (applicate automaticamente all'avvio)
-  editing/ subtitles/ publishing/   (milestone successive)
+  editing/          config, timeline (tagli silenzi), webcam, reframe (smart crop), compositor, renderer
+  subtitles/        cue da parole, preset, writer ASS/SRT
+  publishing/       (Milestone 4)
+assets/             font e modello YuNet (con licenze)
 frontend/src/       React + TS + Tailwind (components, pages, hooks, services, stores, types)
 tests/              pytest
 scripts/            helper bash (check_env.sh, common.sh)

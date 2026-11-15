@@ -111,6 +111,8 @@ class Video(Base):
     has_audio: Mapped[bool] = mapped_column(Boolean, default=False)
     bitrate: Mapped[int | None] = mapped_column(Integer, nullable=True)
     thumbnail_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Webcam overlay region in the source frame, normalised 0..1: {x, y, w, h, source, confidence}
+    webcam_region: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
 
     status: Mapped[str] = mapped_column(String(20), default=VideoStatus.PENDING.value, index=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -177,14 +179,53 @@ class Clip(Base):
     category_scores: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     keywords: Mapped[list[str]] = mapped_column(JSON, default=list)
     preview_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    edit_config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    # Subtitle cues in clip-relative seconds (None = generate from transcript)
+    subtitles: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
     video: Mapped[Video] = relationship(back_populates="clips")
+    renders: Mapped[list[Render]] = relationship(back_populates="clip", cascade="all, delete-orphan",
+                                                 order_by="Render.created_at.desc()")
 
     @property
     def duration(self) -> float:
         return max(0.0, self.end - self.start)
+
+
+class RenderStatus(str, Enum):
+    RENDERING = "rendering"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class Render(Base):
+    """A rendered vertical video for a clip (data/renders)."""
+
+    __tablename__ = "renders"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    clip_id: Mapped[str] = mapped_column(ForeignKey("clips.id", ondelete="CASCADE"), index=True)
+    job_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default=RenderStatus.RENDERING.value)
+    path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    srt_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ass_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    thumbnail_path: Mapped[str | None] = mapped_column(Text, nullable=True)
+    duration: Mapped[float | None] = mapped_column(Float, nullable=True)
+    file_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    width: Mapped[int] = mapped_column(Integer, default=1080)
+    height: Mapped[int] = mapped_column(Integer, default=1920)
+    encoder: Mapped[str] = mapped_column(String(30), default="")
+    config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    stats: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    clip: Mapped[Clip] = relationship(back_populates="renders")
 
 
 class AnalysisStatus(str, Enum):

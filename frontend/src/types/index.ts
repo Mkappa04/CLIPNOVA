@@ -234,3 +234,101 @@ export interface AnalysisResponse {
   analysis: Analysis | null
   timeline: TimelineData | null
 }
+
+// ---------------------------------------------------------------- Milestone 3
+export type Layout = 'full' | 'stack' | 'pip' | 'split'
+export type SubtitlePresetId = 'clean' | 'gaming' | 'viral'
+
+export interface Region {
+  x: number
+  y: number
+  w: number
+  h: number
+  source?: 'auto' | 'manual'
+  confidence?: number
+}
+
+export interface EditConfig {
+  layout: Layout
+  crop_mode: 'smart' | 'center' | 'fit'
+  webcam_region: Region | null
+  hide_webcam_in_gameplay: boolean
+  pip_corner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
+  pip_size: number
+  stack_ratio: number
+  zoom: boolean
+  zoom_strength: number
+  transitions: boolean
+  remove_silences: boolean
+  silence_strategy: 'quiet' | 'no_speech'
+  min_silence_s: number
+  silence_padding_s: number
+  normalize_audio: boolean
+  target_lufs: number
+  denoise: boolean
+  subtitles: boolean
+  subtitle_preset: SubtitlePresetId
+  subtitle_position: 'auto' | 'top' | 'middle' | 'bottom'
+  subtitle_scale: number
+  highlight_words: boolean
+  intro: boolean
+  intro_text: string
+  intro_duration: number
+  outro: boolean
+  outro_text: string
+  outro_duration: number
+  fps: 30 | 60
+  quality: 'draft' | 'standard' | 'high'
+}
+
+export interface EditState {
+  config: EditConfig
+  saved: boolean
+  webcam_region: Region | null
+  warnings: string[]
+}
+
+export interface SubtitlePreset {
+  id: SubtitlePresetId
+  name: string
+  font: string
+  size: number
+  uppercase: boolean
+  primary: string
+  highlight: string
+  max_words: number
+  position: string
+  animation: string
+}
+
+export interface CueWord { start: number; end: number; word: string }
+export interface Cue { start: number; end: number; text: string; words: CueWord[] }
+
+export interface RenderItem {
+  id: string
+  clip_id: string
+  job_id: string | null
+  status: 'rendering' | 'completed' | 'failed' | 'cancelled'
+  duration: number | null
+  file_size: number | null
+  width: number
+  height: number
+  encoder: string
+  config: Partial<EditConfig>
+  stats: { warnings?: string[]; cut_seconds?: number; speed_x?: number; elapsed_s?: number; cues?: number; layout?: string }
+  error: string | null
+  created_at: string
+  finished_at: string | null
+  clip_title: string
+  video_title: string
+  game: string
+  has_thumbnail: boolean
+}
+
+export interface WebcamDetection {
+  region: Region | null
+  frames: number
+  face_frames: number
+  reason: string
+  saved_region: Region | null
+}

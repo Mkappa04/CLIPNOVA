@@ -53,6 +53,15 @@ def gameplay_video(media_dir: Path) -> Path:
 
 
 @pytest.fixture(scope="session")
+def webcam_video(media_dir: Path) -> Path:
+    """20 s 1080p stream with a facecam overlay at x=60 y=700 420x320 and speech from 2 s."""
+    out = media_dir / "facecam.mp4"
+    script = Path(__file__).resolve().parents[1] / "scripts" / "make_test_webcam.sh"
+    subprocess.run(["bash", str(script), str(DATA / "face_pd.jpg"), str(DATA / "jfk.flac"), str(out), "20"], check=True)
+    return out
+
+
+@pytest.fixture(scope="session")
 def client():
     from fastapi.testclient import TestClient
 

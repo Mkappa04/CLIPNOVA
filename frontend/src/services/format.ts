@@ -38,6 +38,7 @@ export const JOB_LABELS: Record<string, string> = {
   'video.probe': 'Analisi metadati',
   'video.copy_import': 'Copia + import',
   'video.analyze': 'Analisi AI + clip detection',
+  'render.clip': 'Render verticale 9:16',
 }
 
 export const LICENSE_LABELS: Record<string, string> = {

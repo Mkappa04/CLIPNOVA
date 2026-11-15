@@ -179,3 +179,68 @@ def analyze_video(ctx: JobContext) -> dict:
             "timings": info["timings"],
             "transcription_device": transcript.device if transcript else None,
             "language": transcript.language if transcript else None}
+
+
+# ---------------------------------------------------------------- rendering (Milestone 3)
+@job_manager.register("render.clip")
+def render_clip(ctx: JobContext) -> dict:
+    import shutil as _shutil
+
+    from backend.core.timeutil import utcnow
+    from backend.editing import service as edit_service
+    from backend.editing.renderer import RenderCancelled, render
+    from backend.models.entities import Clip, ClipStatus, Render, RenderStatus
+
+    clip_id = ctx.payload["clip_id"]
+    with session_scope() as db:
+        clip = db.get(Clip, clip_id)
+        if clip is None:
+            raise RuntimeError(f"Clip {clip_id} not found")
+        cs = edit_service.clip_source(clip)
+        prev_status = clip.status if clip.status != ClipStatus.RENDERING.value else ClipStatus.DETECTED.value
+        r = Render(clip_id=clip_id, job_id=ctx.job_id, status=RenderStatus.RENDERING.value,
+                   config=cs.config.model_dump())
+        db.add(r)
+        db.flush()
+        render_id = r.id
+        clip.status = ClipStatus.RENDERING.value
+    out_dir = get_settings().renders_dir / render_id
+
+    def finish(status: RenderStatus, clip_status: str, **fields) -> None:
+        with session_scope() as db:
+            rr = db.get(Render, render_id)
+            if rr is not None:
+                rr.status = status.value
+                rr.finished_at = utcnow()
+                for k, v in fields.items():
+                    setattr(rr, k, v)
+            c = db.get(Clip, clip_id)
+            if c is not None:
+                c.status = clip_status
+
+    ctx.progress(0.01, "Preparazione render", force=True)
+    try:
+        stats = render(cs, out_dir, on_progress=lambda p, m: ctx.progress(0.02 + 0.95 * p, m),
+                       should_cancel=lambda: ctx.cancelled)
+    except RenderCancelled as e:
+        finish(RenderStatus.CANCELLED, prev_status, error="Annullato")
+        _shutil.rmtree(out_dir, ignore_errors=True)
+        raise JobCancelled() from e
+    except Exception as e:
+        finish(RenderStatus.FAILED, prev_status, error=f"{type(e).__name__}: {e}")
+        raise
+
+    mp4 = out_dir / "clip.mp4"
+    thumb = out_dir / "thumb.jpg"
+    try:
+        t = min(max(0.5, (stats.get("duration") or 1) * 0.4), (stats.get("duration") or 1) - 0.1)
+        ffmpeg.run_ffmpeg(["-ss", f"{t:.2f}", "-i", str(mp4), "-frames:v", "1", "-vf", "scale=360:-2",
+                           "-q:v", "4", "-y", str(thumb)], timeout=60)
+    except Exception as e:  # noqa: BLE001 - thumbnail is optional
+        log.warning("Render thumbnail failed: %s", e)
+    finish(RenderStatus.COMPLETED, ClipStatus.REVIEW.value, path=str(mp4), srt_path=str(out_dir / "subtitles.srt"),
+           ass_path=str(out_dir / "subtitles.ass"), thumbnail_path=str(thumb) if thumb.exists() else None,
+           duration=stats.get("duration"), file_size=stats.get("file_size"), width=stats.get("width") or 1080,
+           height=stats.get("height") or 1920, encoder=stats.get("encoder", ""), stats=stats)
+    return {"message": f"Render completato ({stats.get('encoder')}, {stats.get('speed_x')}x)", "render_id": render_id,
+            **{k: stats[k] for k in ("encoder", "elapsed_s", "speed_x", "duration", "file_size") if k in stats}}

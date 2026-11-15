@@ -163,7 +163,8 @@ def replace_detected_clips(db: Session, video: Video, detected: list[DetectedCli
     existing = db.scalars(select(Clip).where(Clip.video_id == video.id)).all()
     kept = []
     for c in existing:
-        if c.origin == "auto" and c.status == ClipStatus.DETECTED.value:
+        if c.origin == "auto" and c.status == ClipStatus.DETECTED.value and not c.renders and not c.subtitles \
+                and not c.edit_config:
             if c.preview_path:
                 Path(c.preview_path).unlink(missing_ok=True)
             db.delete(c)

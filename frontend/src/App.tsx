@@ -1,10 +1,12 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { ClipDetection } from './pages/ClipDetection'
+import { ClipEditor } from './pages/ClipEditor'
 import { ComingSoon } from './pages/ComingSoon'
 import { Dashboard } from './pages/Dashboard'
 import { RenderQueue } from './pages/RenderQueue'
 import { Settings } from './pages/Settings'
+import { SubtitleEditor } from './pages/SubtitleEditor'
 import { VideoLibrary } from './pages/VideoLibrary'
 
 export default function App() {
@@ -14,11 +16,8 @@ export default function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/library" element={<VideoLibrary />} />
         <Route path="/detection" element={<ClipDetection />} />
-        <Route path="/editor" element={<ComingSoon title="Clip Editor" milestone={3} features={[
-          'Export 1080×1920 H.264/AAC', 'Layout gameplay / webcam / PiP / split', 'Smart crop e reframing',
-          'Zoom dinamici e transizioni', 'Normalizzazione audio', 'Intro/outro opzionali']} />} />
-        <Route path="/subtitles" element={<ComingSoon title="Subtitle Editor" milestone={3} features={[
-          'SRT e ASS sincronizzati', 'Evidenziazione parola per parola', 'Preset Clean / Gaming / Viral', 'Safe area social']} />} />
+        <Route path="/editor" element={<ClipEditor />} />
+        <Route path="/subtitles" element={<SubtitleEditor />} />
         <Route path="/render" element={<RenderQueue />} />
         <Route path="/approval" element={<ComingSoon title="Approval Center" milestone={4} features={[
           'Anteprima e modifica timestamp', 'Modifica sottotitoli, caption, hashtag', 'Approva / Rifiuta / Archivia',
