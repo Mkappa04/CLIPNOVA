@@ -67,6 +67,19 @@ class Settings(BaseSettings):
     publishing_enabled: bool = False
     publish_scheduler_interval_s: int = 30
 
+    # --- Automation (watch folders)
+    automation_enabled: bool = True          # background watcher thread
+    automation_poll_s: int = 15              # polling interval (inotify is unreliable on /mnt/c)
+    automation_stable_s: int = 10            # file size/mtime unchanged for this long = finished writing
+    automation_remux_grace_s: int = 60       # wait for an OBS .mkv → .mp4 remux before importing a .mkv
+    automation_unreadable_timeout_s: int = 900
+
+    # --- Discovery (official APIs, search only)
+    discovery_cache_ttl_h: float = 6.0
+    youtube_daily_quota: int = 10000
+    youtube_quota_reserve: int = 1000        # keep this many units unused
+    twitch_game_name: str = "Grand Theft Auto VI"
+
     # Content generation: "none" = template mode (default, no LLM); "ollama" = optional local LLM
     llm_provider: str = "none"
     llm_model: str = "qwen3.5:4b"

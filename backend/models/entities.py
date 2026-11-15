@@ -116,6 +116,9 @@ class Video(Base):
 
     status: Mapped[str] = mapped_column(String(20), default=VideoStatus.PENDING.value, index=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Quick content signature (size + sampled blocks): prevents importing the same file twice
+    signature: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    origin: Mapped[str] = mapped_column(String(20), default="manual")  # manual | watch_folder
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)

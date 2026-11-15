@@ -69,14 +69,17 @@ def upload_videos(
 
     created: list[Video] = []
     saved: list[Path] = []
+    warnings: list[str] = []
     try:
         for f in files:
             path, size = vs.save_upload_stream(f.file, f.filename or "video")
             saved.append(path)
-            created.append(vs.create_video(
+            v = vs.create_video(
                 db, file_path=path, original_filename=f.filename or path.name,
                 storage_mode=StorageMode.UPLOADED, file_size=size, title=None, game=game,
-                creator=creator, source=source, notes=notes, rights=rights_in))
+                creator=creator, source=source, notes=notes, rights=rights_in)
+            warnings += vs.assign_signature(db, v, path)
+            created.append(v)
         db.commit()
     except Exception:
         db.rollback()
@@ -85,7 +88,7 @@ def upload_videos(
         raise
 
     job_ids = [job_manager.submit("video.probe", {"video_id": v.id}, video_id=v.id) for v in created]
-    return ImportResult(videos=[vs.to_out(db, v) for v in created], job_ids=job_ids)
+    return ImportResult(videos=[vs.to_out(db, v) for v in created], job_ids=job_ids, warnings=warnings)
 
 
 @router.post("/import-path", response_model=ImportResult, status_code=201)
@@ -97,6 +100,7 @@ def import_from_path(req: ImportPathRequest, db: Session = Depends(get_db)) -> I
         source=req.source, notes=req.notes, rights=req.rights,
         status=VideoStatus.COPYING if req.mode == "copy" else VideoStatus.PENDING,
     )
+    warnings += vs.assign_signature(db, video, path)
     db.commit()
     if req.mode == "copy":
         job_id = job_manager.submit("video.copy_import", {"video_id": video.id, "source_path": str(path)},

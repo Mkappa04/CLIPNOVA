@@ -71,7 +71,7 @@ export function Dashboard() {
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-xs text-zinc-500">Pipeline completa attiva. La pubblicazione automatica è disabilitata di default e richiede sempre approvazione e conferma esplicite. La pubblicazione è disabilitata e richiederà sempre approvazione esplicita.</p>
+            <p className="mt-2 text-xs text-zinc-500">Pipeline completa attiva. La pubblicazione automatica è disabilitata di default e richiede sempre approvazione e conferma esplicite.</p>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">

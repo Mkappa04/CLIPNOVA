@@ -100,6 +100,11 @@ def copy_import(ctx: JobContext) -> dict:
 # ---------------------------------------------------------------- analysis (Milestone 2)
 @job_manager.register("video.analyze")
 def analyze_video(ctx: JobContext) -> dict:
+    return run_analysis_job(ctx, ctx.video_id or ctx.payload["video_id"], ctx.payload)
+
+
+def run_analysis_job(ctx, video_id: str, opts: dict) -> dict:
+    """Full analysis of one video (callable from other jobs via a SubContext)."""
     from backend.clip_detection.pipeline import (
         TRANSCRIPT_FILE, SIGNALS_FILE, cache_dir, get_or_create_analysis, replace_detected_clips, run_analysis,
         score_video,
@@ -109,8 +114,6 @@ def analyze_video(ctx: JobContext) -> dict:
     from backend.services.ffmpeg import FFmpegCancelled
     from backend.transcription.whisper_engine import TranscriptionCancelled
 
-    video_id = ctx.video_id or ctx.payload["video_id"]
-    opts = ctx.payload
     language = opts.get("language") if opts.get("language") in ("it", "en") else None
     cfg = ScoringConfig.model_validate(opts.get("scoring") or {})
 
@@ -184,6 +187,11 @@ def analyze_video(ctx: JobContext) -> dict:
 # ---------------------------------------------------------------- rendering (Milestone 3)
 @job_manager.register("render.clip")
 def render_clip(ctx: JobContext) -> dict:
+    return run_render_job(ctx, ctx.payload["clip_id"])
+
+
+def run_render_job(ctx, clip_id: str) -> dict:
+    """Render one clip with its saved edit config (callable from other jobs via a SubContext)."""
     import shutil as _shutil
 
     from backend.core.timeutil import utcnow
@@ -191,7 +199,6 @@ def render_clip(ctx: JobContext) -> dict:
     from backend.editing.renderer import RenderCancelled, render
     from backend.models.entities import Clip, ClipStatus, Render, RenderStatus
 
-    clip_id = ctx.payload["clip_id"]
     with session_scope() as db:
         clip = db.get(Clip, clip_id)
         if clip is None:

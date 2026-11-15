@@ -1,22 +1,26 @@
 import {
-  BarChart3, CheckCircle2, Clapperboard, Film, Gauge, Captions, Layers, Menu, Rocket, ScanSearch, Settings, X,
+  BarChart3, CheckCircle2, Clapperboard, Compass, Film, FolderSync, Gauge, Captions, Layers, Menu, Rocket, ScanSearch, Settings, Users, X,
 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import { api } from '../services/api'
+import { NotificationBell } from './Notifications'
 import { Toasts } from './Toasts'
 import { cx } from './ui'
 
 export const NAV = [
   { to: '/', label: 'Dashboard', icon: Gauge },
   { to: '/library', label: 'Video Library', icon: Film },
+  { to: '/auto-import', label: 'Auto Import', icon: FolderSync },
   { to: '/detection', label: 'Clip Detection', icon: ScanSearch },
   { to: '/editor', label: 'Clip Editor', icon: Clapperboard },
   { to: '/subtitles', label: 'Subtitle Editor', icon: Captions },
   { to: '/render', label: 'Render Queue', icon: Layers },
   { to: '/approval', label: 'Approval Center', icon: CheckCircle2 },
   { to: '/published', label: 'Published Content', icon: Rocket },
+  { to: '/discovery', label: 'Discovery', icon: Compass },
+  { to: '/creators', label: 'Creators', icon: Users },
   { to: '/analytics', label: 'Analytics', icon: BarChart3, milestone: 5 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ] as const
@@ -74,6 +78,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-6 border-r border-ink-800 bg-ink-950/80 p-4 backdrop-blur lg:flex">
         <Logo />
         <div className="flex-1 overflow-y-auto">{nav}</div>
+        <NotificationBell />
         <BackendStatus />
       </aside>
 

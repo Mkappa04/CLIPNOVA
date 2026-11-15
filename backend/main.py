@@ -15,12 +15,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from backend.api.routers import analysis, approval, clips, editing, jobs, publishing, system, videos
+from backend.api.routers import (
+    analysis, approval, automation, clips, creators, discovery, editing, jobs, publishing, system, videos,
+)
 from backend.core.config import PROJECT_ROOT, get_settings
 from backend.core.exceptions import ClipnovaError
 from backend.core.logging import setup_logging
 from backend.database.session import init_db, init_engine
 from backend.workers import handlers  # noqa: F401  (registers job handlers)
+from backend.automation import pipeline as _auto_pipeline  # noqa: F401  (registers auto.pipeline)
+from backend.automation.watcher import watcher
 from backend.publishing.service import scheduler
 from backend.workers.queue import job_manager
 
@@ -38,8 +42,10 @@ async def lifespan(_app: FastAPI):
     init_db()
     job_manager.start(s.worker_concurrency)
     scheduler.start()
+    watcher.start()
     log.info("CLIPNOVA %s ready — data dir: %s", s.version, s.data_dir)
     yield
+    watcher.stop()
     scheduler.stop()
     job_manager.shutdown()
     log.info("CLIPNOVA stopped")
@@ -74,6 +80,9 @@ def create_app() -> FastAPI:
     app.include_router(editing.router)
     app.include_router(approval.router)
     app.include_router(publishing.router)
+    app.include_router(automation.router)
+    app.include_router(discovery.router)
+    app.include_router(creators.router)
 
     _mount_frontend(app)
     return app

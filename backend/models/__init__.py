@@ -20,3 +20,14 @@ from backend.models.entities import (  # noqa: F401
     Video,
     VideoStatus,
 )
+from backend.models.automation_entities import (  # noqa: F401,E402
+    ApiKey,
+    ApiQuota,
+    AppSetting,
+    Creator,
+    CreatorPermission,
+    Notification,
+    SearchCache,
+    WatchedFile,
+    WatchFolder,
+)

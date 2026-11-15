@@ -107,12 +107,19 @@ def create_video(
     return video
 
 
+def windows_to_wsl(raw: str) -> tuple[Path, bool]:
+    """C:\\Users\\x → /mnt/c/Users/x (returns the path and whether it was translated)."""
+    raw = raw.strip().strip('"').strip("'")
+    if re.match(r"^[A-Za-z]:[\\/]", raw):
+        drive = raw[0].lower()
+        return Path(f"/mnt/{drive}/" + raw[3:].replace("\\", "/")), True
+    return Path(raw).expanduser(), False
+
+
 def resolve_import_path(raw: str) -> tuple[Path, list[str]]:
     warnings: list[str] = []
-    path = Path(raw.strip().strip('"').strip("'")).expanduser()
-    if re.match(r"^[A-Za-z]:\\", raw.strip()):
-        drive = raw.strip()[0].lower()
-        path = Path(f"/mnt/{drive}/" + raw.strip()[3:].replace("\\", "/"))
+    path, translated = windows_to_wsl(raw)
+    if translated:
         warnings.append(f"Windows path translated to {path}")
     if not path.is_absolute():
         raise ValidationFailed("Path must be absolute")
@@ -213,3 +220,16 @@ def remove_render_dirs(clip: Clip) -> None:
             d = Path(e.path).resolve()
             if d.parent == exports_root and d.is_dir():
                 shutil.rmtree(d, ignore_errors=True)
+
+
+def assign_signature(db: Session, video: Video, path: Path) -> list[str]:
+    """Store the quick content signature; warn (manual imports) when the same file is already in the library."""
+    from backend.automation.common import quick_signature
+
+    try:
+        sig = quick_signature(path)
+    except OSError:
+        return []
+    video.signature = sig
+    dup = db.scalar(select(Video).where(Video.signature == sig, Video.id != video.id))
+    return [f"«{path.name}» sembra già presente in libreria come «{dup.title}»"] if dup else []

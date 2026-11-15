@@ -66,6 +66,27 @@ class JobContext:
                     job.message = message
 
 
+class SubContext:
+    """Maps a stage of a larger job onto [base, base+span] of the parent's progress."""
+
+    def __init__(self, parent: JobContext | SubContext, base: float, span: float, label: str = "") -> None:
+        self.parent, self.base, self.span, self.label = parent, base, span, label
+        self.job_id = parent.job_id
+        self.payload = parent.payload
+        self.video_id = parent.video_id
+
+    @property
+    def cancelled(self) -> bool:
+        return self.parent.cancelled
+
+    def check_cancelled(self) -> None:
+        self.parent.check_cancelled()
+
+    def progress(self, value: float, message: str | None = None, *, force: bool = False) -> None:
+        msg = f"{self.label}{message}" if message and self.label else message
+        self.parent.progress(self.base + self.span * max(0.0, min(1.0, value)), msg, force=force)
+
+
 Handler = Callable[[JobContext], dict[str, Any] | None]
 
 

@@ -401,3 +401,32 @@ export interface Publication {
   clip_title: string
 }
 export interface LlmStatus { provider: string; model: string; available: boolean; models: string[]; reason?: string }
+
+// ---------------------------------------------------------------- Milestone 4B
+export interface PipelineCfg { analyze: boolean; language: string; render_top_n: number; min_score: number; detect_webcam: boolean; edit_config: Partial<EditConfig> }
+export interface WatchFolderT {
+  id: string; name: string; path: string; enabled: boolean; recursive: boolean; extensions: string[]; mode: 'reference' | 'copy'
+  game: string; creator_name: string; source: string; rights: Partial<Rights>; pipeline: PipelineCfg; creator_id: string | null
+  creator: string | null; exists: boolean; on_windows: boolean; last_scan_at: string | null; last_error: string | null; counts: Record<string, number>
+}
+export interface WatchedFileT { id: string; folder_id: string; name: string; path: string; size: number; status: string; reason: string; stage: string; video_id: string | null; job_id: string | null; attempts: number; first_seen_at: string; updated_at: string }
+export interface AutomationSettingsT { paused: boolean; window: { enabled: boolean; start: string; end: string }; idle_only: boolean; idle_max_cpu: number; idle_max_gpu: number }
+export interface AutomationStatus {
+  settings: AutomationSettingsT; watcher_running: boolean; watcher_enabled: boolean; poll_s: number; stable_s: number; remux_grace_s: number
+  last_tick_at: string | null; last_tick_stats: Record<string, number | boolean>; can_run_now: boolean; blocked_reason: string; counts: Record<string, number>
+}
+export interface NotificationT { id: string; kind: string; title: string; body: string; link: string; read: boolean; created_at: string }
+export interface DiscoveryItem {
+  platform: 'youtube' | 'twitch'; kind?: string; id: string; title: string; creator: string; channel_id: string | null; channel_url: string | null
+  url: string; published_at: string | null; duration_s: number; is_short?: boolean; views: number; likes: number | null; comments: number | null
+  license: string; language: string; thumbnail: string | null; score: number; score_reason: string; attribution_hint?: string
+}
+export interface DiscoveryCreator { platform: string; channel_id: string | null; name: string; url: string | null; items: number; total_views: number; languages: string[]; latest: string | null; cc_by: number; score: number; score_reason: string }
+export interface DiscoveryResult { enabled: boolean; cached?: boolean; cached_at?: string; message?: string; results: DiscoveryItem[]; creators: DiscoveryCreator[]; quota?: { units: number; limit: number; remaining: number; day: string } | null }
+export interface DiscoveryStatus { youtube: { configured: boolean; quota: { units: number; limit: number; remaining: number; day: string } }; twitch: { configured: boolean; game: string }; cache_ttl_h: number; policy: string }
+export interface PermissionT { id: string; granted_at: string; expires_at: string | null; scope: string; commercial_use: boolean; attribution_text: string; restrictions: string; evidence_text: string; has_evidence_file: boolean; revoked: boolean; valid: boolean; days_left: number | null }
+export interface CreatorT {
+  id: string; name: string; language: string; channels: { platform: string; channel_id?: string; url?: string; handle?: string }[]; metrics: Record<string, unknown>
+  score: number; notes: string; contact: string; status: string; status_label: string; status_history: { at: string | null; from: string | null; to: string; note: string }[]
+  source: string; permissions: PermissionT[]; watch_folders: { id: string; path: string; enabled: boolean }[]; created_at: string
+}

@@ -1,4 +1,5 @@
 import type {
+  AutomationSettingsT, AutomationStatus, CreatorT, DiscoveryResult, DiscoveryStatus, NotificationT, WatchFolderT, WatchedFileT,
   ClipContent, ExportItem, LlmStatus, Platform, Publication, PublishingStatus, ReviewItem, SocialAccount,
   Cue, EditConfig, EditState, Region, RenderItem, SubtitlePreset, WebcamDetection,
   AnalysisResponse, Clip, ClipCategory, ClipStatus, ScoringConfig,
@@ -156,6 +157,34 @@ export const api = {
     request<Publication>('/api/publishing/publications', { method: 'POST', body: JSON.stringify(body) }),
   cancelPublication: (id: string) => request<Publication>(`/api/publishing/publications/${id}/cancel`, { method: 'POST' }),
   retryPublication: (id: string) => request<Publication>(`/api/publishing/publications/${id}/retry`, { method: 'POST' }),
+
+  // ---- automation, discovery, creators (Milestone 4B)
+  automationStatus: () => request<AutomationStatus>('/api/automation/status'),
+  saveAutomation: (s: AutomationSettingsT) => request<AutomationStatus>('/api/automation/settings', { method: 'PUT', body: JSON.stringify(s) }),
+  scanNow: () => request<Record<string, number>>('/api/automation/scan', { method: 'POST' }),
+  watchFolders: () => request<WatchFolderT[]>('/api/watch-folders'),
+  addWatchFolder: (body: Record<string, unknown>) => request<WatchFolderT>('/api/watch-folders', { method: 'POST', body: JSON.stringify(body) }),
+  updateWatchFolder: (id: string, body: Record<string, unknown>) => request<WatchFolderT>(`/api/watch-folders/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+  deleteWatchFolder: (id: string) => request<{ deleted: string }>(`/api/watch-folders/${id}${qs({ confirm: true })}`, { method: 'DELETE' }),
+  watchedFiles: (filters: { folder_id?: string; status?: string; limit?: number } = {}) => request<WatchedFileT[]>(`/api/watch-folders/files${qs(filters)}`),
+  retryWatchedFile: (id: string) => request<{ status: string }>(`/api/watch-folders/files/${id}/retry`, { method: 'POST' }),
+  notifications: () => request<{ unread: number; items: NotificationT[] }>('/api/notifications'),
+  readNotifications: () => request<{ unread: number }>('/api/notifications/read', { method: 'POST' }),
+  discoveryStatus: () => request<DiscoveryStatus>('/api/discovery/status'),
+  discoveryKeys: () => request<Record<string, Record<string, string>>>('/api/discovery/keys'),
+  saveDiscoveryKeys: (provider: string, values: Record<string, string>) =>
+    request<{ configured: boolean; keys: Record<string, string> }>('/api/discovery/keys', { method: 'PUT', body: JSON.stringify({ provider, values }) }),
+  discover: (body: Record<string, unknown>) => request<DiscoveryResult>('/api/discovery/search', { method: 'POST', body: JSON.stringify(body) }),
+  creators: () => request<CreatorT[]>('/api/creators'),
+  addCreator: (body: Record<string, unknown>) => request<CreatorT>('/api/creators', { method: 'POST', body: JSON.stringify(body) }),
+  updateCreator: (id: string, body: Record<string, unknown>) => request<CreatorT>(`/api/creators/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteCreator: (id: string) => request<{ deleted: string }>(`/api/creators/${id}${qs({ confirm: true })}`, { method: 'DELETE' }),
+  permissionMessage: (id: string, body: Record<string, unknown>) =>
+    request<{ text: string; generated_by: string; warnings: string[]; note: string }>(`/api/creators/${id}/message`, { method: 'POST', body: JSON.stringify(body) }),
+  addPermission: (id: string, form: FormData) => request<CreatorT>(`/api/creators/${id}/permissions`, { method: 'POST', body: form }),
+  revokePermission: (id: string, pid: string) => request<CreatorT>(`/api/creators/${id}/permissions/${pid}/revoke`, { method: 'POST' }),
+  evidenceUrl: (id: string, pid: string) => `/api/creators/${id}/permissions/${pid}/evidence`,
+  creatorFolder: (id: string, path: string) => request<CreatorT>(`/api/creators/${id}/watch-folder`, { method: 'POST', body: JSON.stringify({ path }) }),
 
   /** Upload with progress (fetch has no upload progress, so XHR). */
   upload(files: File[], meta: UploadMeta, onProgress: (fraction: number) => void,

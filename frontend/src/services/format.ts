@@ -40,6 +40,7 @@ export const JOB_LABELS: Record<string, string> = {
   'video.analyze': 'Analisi AI + clip detection',
   'render.clip': 'Render verticale 9:16',
   'publish.post': 'Pubblicazione social',
+  'auto.pipeline': 'Pipeline automatica (import → render)',
 }
 
 export const LICENSE_LABELS: Record<string, string> = {
@@ -96,3 +97,9 @@ export function formatTime(t: number): string {
 }
 
 export const PLATFORM_LABELS: Record<string, string> = { tiktok: 'TikTok', instagram: 'Instagram Reels', youtube: 'YouTube Shorts' }
+
+export const FILE_STATUS: Record<string, { label: string; tone: 'zinc' | 'cyan' | 'green' | 'amber' | 'red' | 'violet' }> = {
+  waiting: { label: 'in attesa', tone: 'zinc' }, ready: { label: 'importato', tone: 'violet' }, deferred: { label: 'rimandato', tone: 'amber' },
+  processing: { label: 'in lavorazione', tone: 'cyan' }, done: { label: 'completato', tone: 'green' }, skipped: { label: 'scartato', tone: 'zinc' },
+  duplicate: { label: 'duplicato', tone: 'zinc' }, error: { label: 'errore', tone: 'red' },
+}

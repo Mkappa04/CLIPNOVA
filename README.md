@@ -8,6 +8,7 @@ nessun servizio cloud obbligatorio. Primo gioco supportato: **GTA 6**, ma è ind
 > M2: analisi, trascrizione faster-whisper (GPU), clip detection con scoring configurabile.
 > M3: editor automatico 9:16, layout gameplay/webcam, smart crop, zoom, sottotitoli ASS animati, rendering NVENC.
 > M4: approvazione, gestione diritti nell'export, export manuale assistito, architettura di pubblicazione (API ufficiali).
+> M4B: import automatico da cartelle monitorate, scoperta contenuti via API ufficiali, CRM permessi dei creator.
 > Release locale (M5) in roadmap.
 
 ## Requisiti
@@ -153,6 +154,58 @@ una cartella Windows (`CLIPNOVA_EXPORT_COPY_DIR=/mnt/c/Users/<tu>/Videos/CLIPNOV
 - **Testato contro API simulate** (sequenza di chiamate, errori, retry); non contro le piattaforme reali, che
   richiedono le tue credenziali sviluppatore.
 
+## Funzionalità (Milestone 4B): import automatico, scoperta, permessi
+
+### Auto Import (`/auto-import`)
+Aggiungi le cartelle dove OBS / NVIDIA ShadowPlay salvano le registrazioni (anche percorsi Windows: `C:\...`
+diventa `/mnt/c/...`). Per ogni cartella: gioco, creator, profilo diritti, riferimento/copia, estensioni,
+sottocartelle e la **pipeline automatica**:
+
+`import → metadati → analisi + trascrizione → clip detection → rilevamento webcam → render delle migliori N clip → Approval Center`
+
+Mai approvazione o pubblicazione automatica.
+- **Polling** (inotify non vede le scritture di Windows su `/mnt/c`), ogni 15 s.
+- Un file viene importato solo quando **dimensione e data non cambiano per 10 s** e il contenitore è finalizzato
+  (un MP4 in registrazione non ha ancora l'atomo `moov` → ffprobe fallisce → si aspetta).
+- File temporanei/parziali ignorati (`.part`, `.tmp`, `~$…`, nascosti).
+- **Remux di OBS**: se compare `X.mp4` accanto a `X.mkv` si importa solo l'mp4; un `.mkv` da solo aspetta 60 s
+  in più per un eventuale remux; un mp4 remuxato da un mkv già importato viene scartato.
+- **Deduplicazione** con firma rapida (dimensione + 3 blocchi da 1 MB): lo stesso video non entra mai due volte.
+- **Risorse**: tutta la pipeline di un file è un unico job, quindi un solo lavoro pesante alla volta (Whisper, NVENC,
+  Ollama non si sovrappongono). Pausa/ripresa globale, **fascia oraria**, **solo a PC inattivo** (stimato da carico
+  CPU e uso GPU: se stai giocando la GPU è occupata e la pipeline aspetta). Dopo un riavvio i lavori interrotti
+  ripartono da soli.
+- **Notifiche** nella barra laterale quando nuove clip sono pronte da revisionare.
+
+Misurato su una cartella Windows reale: file scritto in 24 s → importato appena stabile → clip in revisione
+**63 s dopo l'inizio della scrittura** (video di 60 s).
+
+### Discovery (`/discovery`): solo ricerca, nessun download
+- **YouTube Data API v3**: video/Shorts per parole chiave, lingua, periodo; classifica per popolarità, crescita
+  (visualizzazioni/ora) ed engagement con il motivo del punteggio; filtro e badge **CC BY** con l'attribuzione da usare.
+  Contatore della quota giornaliera (10.000 unità, una ricerca ≈ 101, reset a mezzanotte ora del Pacifico) e cache
+  locale (6 h).
+- **Twitch Helix**: clip e VOD più visti del gioco per periodo e lingua.
+- Classifica dei creator che producono contenuti adatti, con aggiunta al CRM.
+- **CLIPNOVA non scarica mai video di terzi**, nemmeno CC BY: i termini di YouTube e Twitch non lo consentono con
+  strumenti non ufficiali. Il file va ottenuto in modo legittimo (es. dal creator).
+
+**Chiavi gratuite** (Settings → Scoperta contenuti, salvate cifrate; senza chiavi la funzione è solo disattivata):
+- YouTube: [Google Cloud Console](https://console.cloud.google.com/) → nuovo progetto → *API e servizi* → abilita
+  **YouTube Data API v3** → *Credenziali* → *Crea credenziali* → **Chiave API** (consigliato: limitala a quell'API).
+- Twitch: [dev.twitch.tv/console](https://dev.twitch.tv/console) → *Register Your Application* (categoria *Application
+  Integration*, OAuth Redirect `http://localhost`) → **Client ID** e *New Secret* → **Client Secret**.
+
+### Creators (`/creators`): permessi dei creator
+- Stati: da contattare → contattato → in attesa → autorizzato / rifiutato / scaduto, con storico e note.
+- **Messaggio di richiesta permesso** (it/en; template, LLM locale opzionale con verifica che non aggiunga link,
+  numeri o promesse): cosa, come, uso commerciale sì/no, attribuzione, revocabilità. **L'invio resta manuale**.
+- **Prova del consenso**: testo e/o file (screenshot, PDF, email), data, ambito, scadenza, uso commerciale, restrizioni.
+- **Cartella dedicata** al creator autorizzato: ogni file depositato lì viene importato con i **diritti già compilati**
+  dal consenso ed entra nella pipeline automatica.
+- **Scadenze**: notifica 7 giorni prima; alla scadenza il creator passa a "scaduto", i diritti dei suoi video tornano
+  "in attesa" e l'export si blocca. La revoca ha lo stesso effetto.
+
 ### Prestazioni misurate (i5-11400H, RTX 3060 Laptop 6 GB, WSL 2)
 
 | Video | Tempo analisi | Note |
@@ -206,6 +259,8 @@ backend/            FastAPI app (main.py)
   content_generation/  testi social: template + LLM locale opzionale con guardrail
   publishing/       export manuale, provider (YouTube/TikTok/Instagram), cifratura token, scheduler
   services/approval.py  workflow di revisione e approvazione
+  automation/       watcher a polling, pipeline automatica, gating risorse, CRM creator, notifiche
+  discovery/        YouTube Data API v3 e Twitch Helix (solo ricerca), quota, cache, ranking
 assets/             font e modello YuNet (con licenze)
 frontend/src/       React + TS + Tailwind (components, pages, hooks, services, stores, types)
 tests/              pytest

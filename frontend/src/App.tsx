@@ -1,10 +1,13 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { ApprovalCenter } from './pages/ApprovalCenter'
+import { AutoImport } from './pages/AutoImport'
 import { ClipDetection } from './pages/ClipDetection'
 import { ClipEditor } from './pages/ClipEditor'
 import { ComingSoon } from './pages/ComingSoon'
+import { Creators } from './pages/Creators'
 import { Dashboard } from './pages/Dashboard'
+import { Discovery } from './pages/Discovery'
 import { PublishedContent } from './pages/PublishedContent'
 import { RenderQueue } from './pages/RenderQueue'
 import { Settings } from './pages/Settings'
@@ -17,6 +20,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/library" element={<VideoLibrary />} />
+        <Route path="/auto-import" element={<AutoImport />} />
+        <Route path="/discovery" element={<Discovery />} />
+        <Route path="/creators" element={<Creators />} />
         <Route path="/detection" element={<ClipDetection />} />
         <Route path="/editor" element={<ClipEditor />} />
         <Route path="/subtitles" element={<SubtitleEditor />} />

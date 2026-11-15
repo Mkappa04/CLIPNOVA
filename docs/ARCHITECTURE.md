@@ -125,6 +125,31 @@ ricontrolla abilitazione, conferma, stato della clip e diritti **al momento dell
 `failed` e account `needs_reconnect`. I provider ricevono un `httpx.Client` iniettato (testabile con
 `MockTransport`). Credenziali: Fernet, mai restituite in chiaro (`mask()`).
 
+## Import automatico e scoperta (Milestone 4B)
+
+**Watcher** (`automation/watcher.py`, thread, polling ogni `CLIPNOVA_AUTOMATION_POLL_S`): per ogni cartella elenca i
+candidati e porta ogni `WatchedFile` in `waiting → ready → processing → done` (o `skipped/duplicate/error/deferred`).
+Criteri: stabilità di dimensione+mtime per `AUTOMATION_STABLE_S`, contenitore leggibile da ffprobe, regole di remux
+OBS (`AUTOMATION_REMUX_GRACE_S` per i `.mkv`), firma rapida (`automation/common.quick_signature`) confrontata con
+`videos.signature` e con gli altri file. I diritti vengono dal profilo della cartella o dal consenso del creator
+collegato (`rights_for`). Gli import manuali salvano la firma e mostrano solo un avviso.
+
+**Pipeline** (`automation/pipeline.py`, job `auto.pipeline`): copia opzionale → probe → `run_analysis_job` →
+webcam → render dei migliori N (`run_render_job`) usando `SubContext` per mappare il progresso. È un unico job
+perché la coda ha un worker: un job che aspettasse sotto-job andrebbe in stallo, e così Whisper/NVENC/Ollama non si
+sovrappongono mai. Gating (`can_run_heavy`): pausa, fascia oraria, PC inattivo (load average per thread e uso GPU
+da nvidia-smi, che in WSL include i giochi Windows). Ripresa: un `processing` con job fallito per riavvio torna
+`ready` (max 2 tentativi).
+
+**Discovery** (`discovery/`): chiavi in `api_keys` cifrate con la stessa Fernet dei token social; `api_quota` per
+giorno (YouTube: giorno del Pacifico, `search.list` 100 + `videos.list` 1 unità, riserva configurabile);
+`search_cache` con scadenza. Ranking spiegabile: 40% popolarità (log views), 40% crescita (views/ora), 20%
+engagement; creator: 50% views totali, 30% numero di contenuti, 20% recenza.
+
+**CRM** (`automation/creators.py`): `creators` + `creator_permissions` (prova testo/file in `data/evidence/`).
+`sync_rights` propaga consenso/scadenza/revoca ai video importati dalle cartelle del creator; il controllo orario
+`check_permission_expiry` notifica e scade i creator.
+
 ## Migrazioni
 
 Alembic (`backend/database/migrations`). All'avvio `init_db()` applica `upgrade head`; un DB creato dalla
@@ -136,3 +161,5 @@ Milestone 1 (senza `alembic_version`) viene prima marcato alla baseline `0001`. 
 `videos` 1─1 `rights_records`, `videos` 1─1 `analyses`, `videos` 1─N `clips` 1─N `renders`, `jobs` (N─1 opzionale su `videos`).
 `videos.webcam_region`, `clips.edit_config`, `clips.subtitles` sono JSON (migrazione `0003`).
 M4 (migrazione `0004`): `clips.content/review_note/approved_at`, tabelle `exports`, `social_accounts`, `publications`.
+M4B (migrazione `0005`): `videos.signature/origin`, tabelle `watch_folders`, `watched_files`, `notifications`,
+`app_settings`, `api_keys`, `api_quota`, `search_cache`, `creators`, `creator_permissions`.

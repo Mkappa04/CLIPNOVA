@@ -1,5 +1,6 @@
 import { Cpu, HardDrive, MonitorPlay, Sparkles } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { toast } from '../stores/toastStore'
 import { Badge, ErrorBox, PageHeader, ProgressBar, Spinner } from '../components/ui'
 import { useApi } from '../hooks/useApi'
 import { api } from '../services/api'
@@ -19,6 +20,37 @@ function Panel({ title, icon, children }: { title: string; icon: ReactNode; chil
       <h2 className="mb-3 flex items-center gap-2 font-display font-semibold text-white"><span className="text-nova-400">{icon}</span>{title}</h2>
       {children}
     </section>
+  )
+}
+
+function DiscoveryKeys() {
+  const [keys, setKeys] = useState<Record<string, Record<string, string>>>({})
+  const [edit, setEdit] = useState<Record<string, string>>({})
+  useEffect(() => { api.discoveryKeys().then(setKeys).catch(() => {}) }, [])
+  const save = async (provider: string, fields: string[]) => {
+    const values = Object.fromEntries(fields.map((f) => [f, edit[`${provider}.${f}`] ?? '']).filter(([, v]) => v))
+    try { await api.saveDiscoveryKeys(provider, values); setKeys(await api.discoveryKeys()); setEdit({}); toast.success('Chiavi salvate (cifrate)') } catch (e) { toast.error(e) }
+  }
+  const block = (provider: string, title: string, fields: string[], help: ReactNode) => (
+    <div className="space-y-2 rounded-lg bg-ink-850 p-3 ring-1 ring-ink-700">
+      <div className="text-sm font-semibold text-white">{title}</div>
+      {fields.map((f) => (
+        <label key={f} className="grid grid-cols-[110px_1fr] items-center gap-2 text-xs">
+          <span className="text-zinc-400">{f}</span>
+          <input className="input py-1 font-mono text-xs" type="password" autoComplete="off" placeholder={keys[provider]?.[f] || 'non impostata'}
+                 value={edit[`${provider}.${f}`] ?? ''} onChange={(e) => setEdit({ ...edit, [`${provider}.${f}`]: e.target.value })} />
+        </label>
+      ))}
+      <p className="text-[11px] text-zinc-500">{help}</p>
+      <button className="btn-cyan px-2.5 py-1 text-xs" onClick={() => save(provider, fields)}>Salva</button>
+    </div>
+  )
+  return (
+    <div className="space-y-3">
+      {block('youtube_data', 'YouTube Data API v3', ['api_key'], <>Gratuita: Google Cloud Console → nuovo progetto → abilita «YouTube Data API v3» → Credenziali → Chiave API. 10.000 unità/giorno (una ricerca ≈ 101).</>)}
+      {block('twitch', 'Twitch Helix', ['client_id', 'client_secret'], <>Gratuito: dev.twitch.tv/console → Register Your Application (OAuth redirect http://localhost) → Client ID e Client Secret.</>)}
+      <p className="text-xs text-zinc-500">Solo ricerca: CLIPNOVA non scarica mai video di terzi. Le chiavi sono cifrate in locale.</p>
+    </div>
   )
 }
 
@@ -79,6 +111,8 @@ export function Settings() {
             <Row k="FFmpeg" v={<span className="font-mono text-xs">{sys.ffmpeg.ffmpeg?.split(' ').slice(0, 3).join(' ')}</span>} />
             <Row k="HW accel" v={sys.ffmpeg.hwaccels.join(', ') || '—'} />
           </Panel>
+
+          <Panel title="Scoperta contenuti (API gratuite)" icon={<Sparkles size={18} />}><DiscoveryKeys /></Panel>
 
           {cfg && (
             <Panel title="Configurazione" icon={<Cpu size={18} />}>
