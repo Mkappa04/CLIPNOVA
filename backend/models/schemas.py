@@ -231,3 +231,82 @@ class SubtitleCue(BaseModel):
 
 class SubtitlesIn(BaseModel):
     cues: list[SubtitleCue]
+
+
+# ---------------------------------------------------------------- approval, export, publishing (Milestone 4)
+class ContentIn(BaseModel):
+    language: Literal["it", "en"] = "it"
+    title: str = Field("", max_length=100)
+    hook: str = Field("", max_length=150)
+    caption: str = Field("", max_length=2200)
+    description: str = Field("", max_length=5000)
+    hashtags: list[str] = Field(default_factory=list, max_length=30)
+    cta: str = Field("", max_length=150)
+
+
+class ReviewAction(BaseModel):
+    note: str = Field("", max_length=1000)
+
+
+class ExportRequest(BaseModel):
+    platforms: list[Literal["tiktok", "instagram", "youtube"]] = Field(min_length=1)
+    purpose: Literal["non_commercial", "commercial"] = "commercial"
+
+
+class ExportOut(ORMModel):
+    id: str
+    clip_id: str
+    render_id: str | None
+    platforms: list[str]
+    purpose: str
+    path: str
+    copied_to: str | None
+    rights_snapshot: dict[str, Any]
+    content_snapshot: dict[str, Any]
+    created_at: UTCDateTime
+    files: list[str] = []
+    clip_title: str = ""
+    video_title: str = ""
+
+
+class AccountIn(BaseModel):
+    platform: Literal["tiktok", "instagram", "youtube"]
+    display_name: str = Field("", max_length=200)
+    credentials: dict[str, str]
+
+
+class AccountOut(ORMModel):
+    id: str
+    platform: str
+    display_name: str
+    status: str
+    created_at: UTCDateTime
+    credentials: dict[str, str] = {}
+
+
+class PublicationIn(BaseModel):
+    export_id: str
+    account_id: str
+    scheduled_at: datetime | None = None
+    privacy: Literal["private", "unlisted", "public"] = "private"
+    confirm: bool = Field(False, description="Explicit confirmation that this approved clip may be published")
+
+
+class PublicationOut(ORMModel):
+    id: str
+    clip_id: str
+    export_id: str
+    account_id: str
+    platform: str
+    status: str
+    privacy: str
+    scheduled_at: UTCDateTime
+    attempts: int
+    max_attempts: int
+    next_attempt_at: UTCDateTime | None
+    last_error: str | None
+    remote_id: str | None
+    remote_url: str | None
+    log: list[dict[str, Any]]
+    created_at: UTCDateTime
+    clip_title: str = ""

@@ -39,6 +39,7 @@ export const JOB_LABELS: Record<string, string> = {
   'video.copy_import': 'Copia + import',
   'video.analyze': 'Analisi AI + clip detection',
   'render.clip': 'Render verticale 9:16',
+  'publish.post': 'Pubblicazione social',
 }
 
 export const LICENSE_LABELS: Record<string, string> = {
@@ -93,3 +94,5 @@ export function formatTime(t: number): string {
   const s = t - m * 60
   return `${m}:${s.toFixed(1).padStart(4, '0')}`
 }
+
+export const PLATFORM_LABELS: Record<string, string> = { tiktok: 'TikTok', instagram: 'Instagram Reels', youtube: 'YouTube Shorts' }

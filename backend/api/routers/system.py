@@ -42,6 +42,8 @@ def settings() -> dict:
         "default_language": s.default_language, "publishing_enabled": s.publishing_enabled,
         "supported_extensions": sorted(SUPPORTED_VIDEO_EXTENSIONS),
         "whisper_model": s.whisper_model, "whisper_cpu_model": s.whisper_cpu_model,
+        "llm_provider": s.llm_provider, "llm_model": s.llm_model,
+        "export_copy_dir": str(s.export_copy_dir) if s.export_copy_dir else None,
     }
 
 

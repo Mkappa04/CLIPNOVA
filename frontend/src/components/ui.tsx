@@ -40,12 +40,12 @@ const STATUS_TONES: Record<string, Tone> = {
   pending: 'zinc', queued: 'zinc', unknown: 'zinc',
   copying: 'cyan', probing: 'cyan', analyzing: 'cyan', running: 'cyan', detected: 'violet',
   error: 'red', failed: 'red', denied: 'red', rejected: 'red',
-  cancelled: 'amber', review: 'amber', rendering: 'cyan',
+  cancelled: 'amber', review: 'amber', rendering: 'cyan', exported: 'violet', scheduled: 'zinc', publishing: 'cyan', published: 'green',
 }
 const STATUS_LABELS: Record<string, string> = {
   ready: 'pronto', analyzed: 'analizzato', completed: 'completato', pending: 'in attesa', queued: 'in coda',
   copying: 'copia', probing: 'lettura', analyzing: 'analisi', running: 'in corso', error: 'errore',
-  failed: 'fallito', cancelled: 'annullato', detected: 'rilevata', review: 'revisione', rendering: 'rendering', rejected: 'scartata', archived: 'archiviata', authorized: 'autorizzato', denied: 'negato', unknown: 'sconosciuto',
+  failed: 'fallito', cancelled: 'annullato', detected: 'rilevata', review: 'revisione', rendering: 'rendering', approved: 'approvata', exported: 'esportata', scheduled: 'programmata', publishing: 'in pubblicazione', published: 'pubblicata', rejected: 'scartata', archived: 'archiviata', authorized: 'autorizzato', denied: 'negato', unknown: 'sconosciuto',
 }
 
 export function StatusBadge({ status }: { status: string }) {

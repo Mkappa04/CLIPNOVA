@@ -66,12 +66,12 @@ export function Dashboard() {
               {PIPELINE.map((step, i) => (
                 <div key={step} className="flex flex-1 items-center gap-1">
                   <div className={`flex-1 rounded-lg px-2 py-2 text-center text-xs font-semibold uppercase tracking-wider ring-1 ${
-                    i < 6 ? 'bg-nova-500/15 text-nova-200 ring-nova-500/40' : 'bg-ink-850 text-zinc-500 ring-ink-700'}`}>{step}</div>
+                    i < 8 ? 'bg-nova-500/15 text-nova-200 ring-nova-500/40' : 'bg-ink-850 text-zinc-500 ring-ink-700'}`}>{step}</div>
                   {i < PIPELINE.length - 1 && <span className="text-zinc-600">›</span>}
                 </div>
               ))}
             </div>
-            <p className="mt-2 text-xs text-zinc-500">Attivi: Import, Analysis, Clip Detection, Editing, Rendering e Review (Milestone 3). La pubblicazione è disabilitata e richiederà sempre approvazione esplicita.</p>
+            <p className="mt-2 text-xs text-zinc-500">Pipeline completa attiva. La pubblicazione automatica è disabilitata di default e richiede sempre approvazione e conferma esplicite. La pubblicazione è disabilitata e richiederà sempre approvazione esplicita.</p>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">

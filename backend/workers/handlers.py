@@ -244,3 +244,14 @@ def render_clip(ctx: JobContext) -> dict:
            height=stats.get("height") or 1920, encoder=stats.get("encoder", ""), stats=stats)
     return {"message": f"Render completato ({stats.get('encoder')}, {stats.get('speed_x')}x)", "render_id": render_id,
             **{k: stats[k] for k in ("encoder", "elapsed_s", "speed_x", "duration", "file_size") if k in stats}}
+
+
+# ---------------------------------------------------------------- publishing (Milestone 4)
+@job_manager.register("publish.post")
+def publish_post(ctx: JobContext) -> dict:
+    from backend.publishing.service import publish_now
+
+    status = publish_now(ctx.payload["publication_id"], log_fn=lambda m: ctx.progress(0.5, m))
+    if status == "failed":
+        raise RuntimeError("Publication failed: see the publication log")
+    return {"message": f"Pubblicazione: {status}", "status": status}

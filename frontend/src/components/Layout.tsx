@@ -15,8 +15,8 @@ export const NAV = [
   { to: '/editor', label: 'Clip Editor', icon: Clapperboard },
   { to: '/subtitles', label: 'Subtitle Editor', icon: Captions },
   { to: '/render', label: 'Render Queue', icon: Layers },
-  { to: '/approval', label: 'Approval Center', icon: CheckCircle2, milestone: 4 },
-  { to: '/published', label: 'Published Content', icon: Rocket, milestone: 4 },
+  { to: '/approval', label: 'Approval Center', icon: CheckCircle2 },
+  { to: '/published', label: 'Published Content', icon: Rocket },
   { to: '/analytics', label: 'Analytics', icon: BarChart3, milestone: 5 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ] as const

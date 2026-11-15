@@ -4,10 +4,11 @@ Piattaforma **locale** per trasformare registrazioni gaming autorizzate in conte
 (TikTok, Instagram Reels, YouTube Shorts). Gira interamente dentro **Ubuntu su WSL 2**, budget 0 €,
 nessun servizio cloud obbligatorio. Primo gioco supportato: **GTA 6**, ma è indipendente dal gioco.
 
-> Stato: **Milestone 3** completata. M1: import, libreria, diritti, job queue, dashboard.
+> Stato: **Milestone 4** completata. M1: import, libreria, diritti, job queue, dashboard.
 > M2: analisi, trascrizione faster-whisper (GPU), clip detection con scoring configurabile.
 > M3: editor automatico 9:16, layout gameplay/webcam, smart crop, zoom, sottotitoli ASS animati, rendering NVENC.
-> Approvazione/export/publishing (M4) e release (M5) sono in roadmap.
+> M4: approvazione, gestione diritti nell'export, export manuale assistito, architettura di pubblicazione (API ufficiali).
+> Release locale (M5) in roadmap.
 
 ## Requisiti
 
@@ -114,6 +115,44 @@ parola restano quelli di Whisper, altrimenti vengono ridistribuiti. Export SRT/A
 Font inclusi in `assets/fonts` (Anton: SIL OFL; Luckiest Guy: Apache 2.0); modello volti in `assets/models`
 (YuNet, MIT). Licenze accanto ai file.
 
+## Funzionalità (Milestone 4): approvazione, export, pubblicazione
+
+Workflow: `IMPORT → ANALYSIS → CLIP DETECTION → EDITING → RENDERING → REVIEW → APPROVED → EXPORT / PUBLISH`
+
+**Approval Center** (`/approval`): per ogni clip renderizzata vedi il video 9:16, la verifica dei diritti
+(commerciale / non commerciale) e i testi. Azioni: **Approva** (solo da *review* e con un render completato),
+Rifiuta (con nota), Archivia, Riapri, Rigenera (nuovo render), link a editor e sottotitoli.
+Se modifichi i testi o rifai il render di una clip approvata, **l'approvazione viene revocata** e la clip torna in
+revisione: si approva sempre esattamente ciò che verrà pubblicato.
+
+**Testi social** (titolo, hook, caption, descrizione, hashtag, CTA; italiano/inglese):
+- *modalità senza LLM* (default): template che citano solo frasi realmente pronunciate nella clip; hashtag dal
+  gioco, dalla categoria e solo dalle keyword di gioco (mai le parolacce usate come indizi di "rage");
+- *LLM locale opzionale* (`CLIPNOVA_LLM_PROVIDER=ollama`, default `qwen3.5:4b`): riscrive solo i testi brevi; la
+  descrizione resta fattuale; ogni campo con >20% di parole non presenti nella clip viene **scartato** e segnalato;
+  i nomi propri nuovi vengono evidenziati. Il modello viene scaricato dalla VRAM subito dopo (keep_alive 0).
+
+**Diritti → export**: l'export è bloccato (HTTP 403 con le motivazioni) se la licenza è sconosciuta o
+*solo credito*, l'autorizzazione non è "autorizzato" o è scaduta, manca il testo di attribuzione richiesto, o per
+uso commerciale con licenza NC / uso commerciale non consentito. L'attribuzione viene aggiunta automaticamente ai testi.
+
+**Export manuale assistito**: `data/exports/<id>/` con MP4, `tiktok.txt` / `instagram.txt` / `youtube.txt`
+(entro i limiti di ogni piattaforma, #Shorts per YouTube), `subtitles.srt`, `thumbnail.jpg`, `CHECKLIST.txt`
+(passi di caricamento + diritti e restrizioni), `metadata.json`, `package.zip`. Opzionale: copia automatica in
+una cartella Windows (`CLIPNOVA_EXPORT_COPY_DIR=/mnt/c/Users/<tu>/Videos/CLIPNOVA`).
+
+**Pubblicazione (disabilitata per default)** — pagina *Published Content*:
+- solo **API ufficiali**: YouTube Data API v3 (upload resumable), TikTok Content Posting API (Direct Post),
+  Instagram Graph API (Reels; richiede un URL pubblico del video che CLIPNOVA non espone → usa l'export manuale);
+- account con credenziali **cifrate** (Fernet, chiave in `data/secret.key` 0600 o `CLIPNOVA_SECRET_KEY`), mai
+  restituite in chiaro dall'API;
+- pubblicazione solo con `CLIPNOVA_PUBLISHING_ENABLED=true` **e** clip approvata **e** conferma esplicita;
+  diritti ricontrollati al momento dell'invio (un'autorizzazione scaduta blocca la pubblicazione);
+- scheduling, retry con backoff esponenziale (2, 4, 8 min) per errori temporanei, log per ogni tentativo;
+- le app non verificate dalle piattaforme possono pubblicare solo in privato (TikTok SELF_ONLY, YouTube private).
+- **Testato contro API simulate** (sequenza di chiamate, errori, retry); non contro le piattaforme reali, che
+  richiedono le tue credenziali sviluppatore.
+
 ### Prestazioni misurate (i5-11400H, RTX 3060 Laptop 6 GB, WSL 2)
 
 | Video | Tempo analisi | Note |
@@ -164,7 +203,9 @@ backend/            FastAPI app (main.py)
   database/migrations/  migrazioni Alembic (applicate automaticamente all'avvio)
   editing/          config, timeline (tagli silenzi), webcam, reframe (smart crop), compositor, renderer
   subtitles/        cue da parole, preset, writer ASS/SRT
-  publishing/       (Milestone 4)
+  content_generation/  testi social: template + LLM locale opzionale con guardrail
+  publishing/       export manuale, provider (YouTube/TikTok/Instagram), cifratura token, scheduler
+  services/approval.py  workflow di revisione e approvazione
 assets/             font e modello YuNet (con licenze)
 frontend/src/       React + TS + Tailwind (components, pages, hooks, services, stores, types)
 tests/              pytest

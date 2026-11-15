@@ -182,6 +182,10 @@ class Clip(Base):
     edit_config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     # Subtitle cues in clip-relative seconds (None = generate from transcript)
     subtitles: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    # Social copy: {language, title, hook, caption, description, hashtags, cta, generated_by}
+    content: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
+    review_note: Mapped[str] = mapped_column(Text, default="")
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -192,6 +196,80 @@ class Clip(Base):
     @property
     def duration(self) -> float:
         return max(0.0, self.end - self.start)
+
+
+class ExportPurpose(str, Enum):
+    NON_COMMERCIAL = "non_commercial"
+    COMMERCIAL = "commercial"
+
+
+class Export(Base):
+    """A manual-upload package for one or more platforms (data/exports/<id>)."""
+
+    __tablename__ = "exports"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    clip_id: Mapped[str] = mapped_column(ForeignKey("clips.id", ondelete="CASCADE"), index=True)
+    render_id: Mapped[str | None] = mapped_column(ForeignKey("renders.id", ondelete="SET NULL"), nullable=True)
+    platforms: Mapped[list[str]] = mapped_column(JSON, default=list)
+    purpose: Mapped[str] = mapped_column(String(20), default=ExportPurpose.COMMERCIAL.value)
+    path: Mapped[str] = mapped_column(Text, default="")
+    copied_to: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rights_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    content_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    clip: Mapped[Clip] = relationship()
+
+
+class SocialAccount(Base):
+    """A connected platform account. Tokens are encrypted at rest (Fernet)."""
+
+    __tablename__ = "social_accounts"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    platform: Mapped[str] = mapped_column(String(20), index=True)
+    display_name: Mapped[str] = mapped_column(String(200), default="")
+    credentials_encrypted: Mapped[str] = mapped_column(Text, default="")
+    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String(20), default="connected")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+
+class PublicationStatus(str, Enum):
+    SCHEDULED = "scheduled"
+    PUBLISHING = "publishing"
+    PUBLISHED = "published"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class Publication(Base):
+    __tablename__ = "publications"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    clip_id: Mapped[str] = mapped_column(ForeignKey("clips.id", ondelete="CASCADE"), index=True)
+    export_id: Mapped[str] = mapped_column(ForeignKey("exports.id", ondelete="CASCADE"))
+    account_id: Mapped[str] = mapped_column(ForeignKey("social_accounts.id", ondelete="CASCADE"))
+    platform: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(20), default=PublicationStatus.SCHEDULED.value, index=True)
+    privacy: Mapped[str] = mapped_column(String(20), default="private")
+    scheduled_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, default=3)
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    remote_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    remote_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    log: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    approved_confirmation: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    clip: Mapped[Clip] = relationship()
+    export: Mapped[Export] = relationship()
+    account: Mapped[SocialAccount] = relationship()
 
 
 class RenderStatus(str, Enum):

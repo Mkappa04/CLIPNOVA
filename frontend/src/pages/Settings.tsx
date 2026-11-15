@@ -88,6 +88,8 @@ export function Settings() {
               <Row k="Lingua predefinita" v={cfg.default_language} />
               <Row k="Upload massimo" v={`${cfg.max_upload_mb} MB`} />
               <Row k="Pubblicazione social" v={cfg.publishing_enabled ? <Badge tone="amber">abilitata</Badge> : <Badge tone="green">disabilitata</Badge>} />
+              <Row k="Generazione testi" v={cfg.llm_provider === 'ollama' ? `LLM locale (${cfg.llm_model})` : 'Template (senza LLM)'} />
+              <Row k="Copia export" v={<span className="break-all font-mono text-xs">{cfg.export_copy_dir ?? '—'}</span>} />
               <Row k="Formati" v={<span className="text-xs">{cfg.supported_extensions.join(' ')}</span>} />
             </Panel>
           )}

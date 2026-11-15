@@ -99,6 +99,7 @@ def update_clip(clip_id: str, body: ClipUpdate, db: Session = Depends(get_db)):
         clip.suggested_title = data["suggested_title"]
     if "status" in data:
         clip.status = data["status"]
+        clip.approved_at = None  # any manual status change drops a previous approval
     db.commit()
     db.refresh(clip)
     return clip_out(clip)

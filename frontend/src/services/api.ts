@@ -1,4 +1,5 @@
 import type {
+  ClipContent, ExportItem, LlmStatus, Platform, Publication, PublishingStatus, ReviewItem, SocialAccount,
   Cue, EditConfig, EditState, Region, RenderItem, SubtitlePreset, WebcamDetection,
   AnalysisResponse, Clip, ClipCategory, ClipStatus, ScoringConfig,
   AppSettings, DashboardData, ImportResult, Job, Purpose, Rights, RightsDecision, SystemInfo, Video,
@@ -127,6 +128,34 @@ export const api = {
   renderFileUrl: (id: string, download = false) => `/api/renders/${id}/file${download ? '?download=true' : ''}`,
   renderThumbUrl: (id: string) => `/api/renders/${id}/thumbnail`,
   renderSubsUrl: (id: string, format: 'srt' | 'ass') => `/api/renders/${id}/subtitles?format=${format}`,
+
+  // ---- approval, export, publishing (Milestone 4)
+  approvalQueue: (status: string) => request<ReviewItem[]>(`/api/approval/queue${qs({ status })}`),
+  approvalCounts: () => request<Record<string, number>>('/api/approval/counts'),
+  review: (clipId: string) => request<ReviewItem>(`/api/clips/${clipId}/review`),
+  generateContent: (clipId: string, useLlm: boolean, language?: string) =>
+    request<{ content: ClipContent; warnings: string[] }>(`/api/clips/${clipId}/content/generate`, { method: 'POST', body: JSON.stringify({ use_llm: useLlm, language }) }),
+  saveContent: (clipId: string, content: ClipContent) =>
+    request<ReviewItem>(`/api/clips/${clipId}/content`, { method: 'PUT', body: JSON.stringify(content) }),
+  reviewAction: (clipId: string, action: 'approve' | 'reject' | 'archive' | 'reopen', note = '') =>
+    request<ReviewItem>(`/api/clips/${clipId}/${action}`, { method: 'POST', body: JSON.stringify({ note }) }),
+  regenerate: (clipId: string) => request<{ job_id: string }>(`/api/clips/${clipId}/regenerate`, { method: 'POST' }),
+  llmStatus: () => request<LlmStatus>('/api/llm/status'),
+  createExport: (clipId: string, platforms: Platform[], purpose: 'commercial' | 'non_commercial') =>
+    request<ExportItem>(`/api/clips/${clipId}/export`, { method: 'POST', body: JSON.stringify({ platforms, purpose }) }),
+  exports: (filters: { clip_id?: string; limit?: number } = {}) => request<ExportItem[]>(`/api/exports${qs(filters)}`),
+  exportFileUrl: (id: string, name: string) => `/api/exports/${id}/files/${encodeURIComponent(name)}`,
+  deleteExport: (id: string) => request<{ deleted: string }>(`/api/exports/${id}${qs({ confirm: true })}`, { method: 'DELETE' }),
+  publishingStatus: () => request<PublishingStatus>('/api/publishing/status'),
+  accounts: () => request<SocialAccount[]>('/api/publishing/accounts'),
+  addAccount: (platform: Platform, display_name: string, credentials: Record<string, string>) =>
+    request<SocialAccount>('/api/publishing/accounts', { method: 'POST', body: JSON.stringify({ platform, display_name, credentials }) }),
+  deleteAccount: (id: string) => request<{ deleted: string }>(`/api/publishing/accounts/${id}${qs({ confirm: true })}`, { method: 'DELETE' }),
+  publications: () => request<Publication[]>('/api/publishing/publications'),
+  schedulePublication: (body: { export_id: string; account_id: string; scheduled_at?: string; privacy: string; confirm: boolean }) =>
+    request<Publication>('/api/publishing/publications', { method: 'POST', body: JSON.stringify(body) }),
+  cancelPublication: (id: string) => request<Publication>(`/api/publishing/publications/${id}/cancel`, { method: 'POST' }),
+  retryPublication: (id: string) => request<Publication>(`/api/publishing/publications/${id}/retry`, { method: 'POST' }),
 
   /** Upload with progress (fetch has no upload progress, so XHR). */
   upload(files: File[], meta: UploadMeta, onProgress: (fraction: number) => void,

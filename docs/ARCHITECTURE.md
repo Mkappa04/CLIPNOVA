@@ -28,7 +28,7 @@ e sono annullabili.
 | Diritti e policy di export | 1 ✅ (policy) / 4 (enforcement export) | `rights_management/policy.py` |
 | Scene/audio/trascrizione, scoring | 2 ✅ | `clip_detection/`, `transcription/` |
 | Editing 9:16, layout, sottotitoli, render | 3 ✅ | `editing/`, `subtitles/` |
-| Revisione, approvazione, export, publishing | 4 | `publishing/` |
+| Revisione, approvazione, export, publishing | 4 ✅ | `services/approval.py`, `publishing/`, `content_generation/` |
 
 ## Job queue (`backend/workers/queue.py`)
 
@@ -109,6 +109,22 @@ ffmpeg decode (-ss, fps, ≤1920 px, rawvideo BGR) ─▶ Compositor (NumPy/Open
   misurati (risultato verificato: −14,1 LUFS).
 - Ogni render produce `data/renders/<render_id>/` con `clip.mp4`, `subtitles.ass`, `subtitles.srt`, `thumb.jpg`.
 
+## Approvazione, export e pubblicazione (Milestone 4)
+
+Stati clip: `detected → (rendering) → review → approved → exported`, più `rejected` / `archived`.
+`approve` richiede `review` + render completato; modificare i testi di una clip approvata (o rifarne il render)
+la riporta in `review`. Ogni cambio di stato manuale azzera `approved_at`.
+
+Export (`publishing/exporter.py`): `check_exportable` = clip approvata + `rights_management.policy.evaluate`
+per lo scopo scelto. Il pacchetto conserva lo snapshot dei diritti e dei testi usati.
+
+Pubblicazione (`publishing/service.py`): `Publication` creata solo via API con `confirm=true` e pubblicazione
+abilitata. Lo `Scheduler` (thread, ogni 30 s) passa le pubblicazioni scadute al job `publish.post`; `preflight()`
+ricontrolla abilitazione, conferma, stato della clip e diritti **al momento dell'invio**. Errori `retryable`
+(429/5xx/rete) → nuovo tentativo con backoff `2^n` minuti fino a `max_attempts`; errori di autorizzazione →
+`failed` e account `needs_reconnect`. I provider ricevono un `httpx.Client` iniettato (testabile con
+`MockTransport`). Credenziali: Fernet, mai restituite in chiaro (`mask()`).
+
 ## Migrazioni
 
 Alembic (`backend/database/migrations`). All'avvio `init_db()` applica `upgrade head`; un DB creato dalla
@@ -119,3 +135,4 @@ Milestone 1 (senza `alembic_version`) viene prima marcato alla baseline `0001`. 
 
 `videos` 1─1 `rights_records`, `videos` 1─1 `analyses`, `videos` 1─N `clips` 1─N `renders`, `jobs` (N─1 opzionale su `videos`).
 `videos.webcam_region`, `clips.edit_config`, `clips.subtitles` sono JSON (migrazione `0003`).
+M4 (migrazione `0004`): `clips.content/review_note/approved_at`, tabelle `exports`, `social_accounts`, `publications`.

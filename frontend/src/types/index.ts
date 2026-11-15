@@ -132,6 +132,9 @@ export interface AppSettings {
   supported_extensions: string[]
   whisper_model: string
   whisper_cpu_model: string
+  llm_provider: string
+  llm_model: string
+  export_copy_dir: string | null
 }
 
 export const EMPTY_RIGHTS: Rights = {
@@ -332,3 +335,69 @@ export interface WebcamDetection {
   reason: string
   saved_region: Region | null
 }
+
+// ---------------------------------------------------------------- Milestone 4
+export type Platform = 'tiktok' | 'instagram' | 'youtube'
+
+export interface ClipContent {
+  language: 'it' | 'en'
+  title: string
+  hook: string
+  caption: string
+  description: string
+  hashtags: string[]
+  cta: string
+  category?: string
+  generated_by?: string
+}
+
+export interface ReviewItem {
+  clip: Clip
+  render: RenderItem | null
+  content: ClipContent | null
+  review_note: string
+  approved_at: string | null
+  rights: Record<'non_commercial' | 'commercial', RightsDecision>
+  attribution: string
+  approval_revoked?: boolean
+}
+
+export interface ExportItem {
+  id: string
+  clip_id: string
+  render_id: string | null
+  platforms: Platform[]
+  purpose: 'commercial' | 'non_commercial'
+  path: string
+  copied_to: string | null
+  rights_snapshot: RightsDecision
+  content_snapshot: { content?: ClipContent; platform_texts?: Record<string, { caption?: string; title?: string; description?: string }> }
+  created_at: string
+  files: string[]
+  clip_title: string
+  video_title: string
+}
+
+export interface ProviderInfo { platform: Platform; name: string; docs_url: string; credential_fields: string[]; notes: string }
+export interface PublishingStatus { enabled: boolean; explanation: string; export_copy_dir: string | null; providers: ProviderInfo[] }
+export interface SocialAccount { id: string; platform: Platform; display_name: string; status: string; created_at: string; credentials: Record<string, string> }
+export interface Publication {
+  id: string
+  clip_id: string
+  export_id: string
+  account_id: string
+  platform: Platform
+  status: 'scheduled' | 'publishing' | 'published' | 'failed' | 'cancelled'
+  privacy: 'private' | 'unlisted' | 'public'
+  scheduled_at: string
+  attempts: number
+  max_attempts: number
+  next_attempt_at: string | null
+  last_error: string | null
+  remote_id: string | null
+  remote_url: string | null
+  log: { at: string; msg: string }[]
+  created_at: string
+  clip_title: string
+}
+export interface LlmStatus { provider: string; model: string; available: boolean; models: string[]; reason?: string }

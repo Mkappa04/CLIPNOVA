@@ -195,9 +195,21 @@ def copy_with_progress(src: Path, dest: Path, on_progress, should_cancel) -> Non
 
 
 def remove_render_dirs(clip: Clip) -> None:
-    """Delete render output folders of a clip (only inside data/renders)."""
-    root = get_settings().renders_dir.resolve()
+    """Delete render and export folders of a clip (only inside data/renders and data/exports)."""
+    from backend.models.entities import Export
+
+    s = get_settings()
+    root = s.renders_dir.resolve()
     for r in clip.renders:
         d = (root / r.id).resolve()
         if d.parent == root and d.is_dir():
             shutil.rmtree(d, ignore_errors=True)
+    exports_root = s.exports_dir.resolve()
+    from sqlalchemy.orm import object_session
+
+    db = object_session(clip)
+    if db is not None:
+        for e in db.query(Export).filter(Export.clip_id == clip.id).all():
+            d = Path(e.path).resolve()
+            if d.parent == exports_root and d.is_dir():
+                shutil.rmtree(d, ignore_errors=True)

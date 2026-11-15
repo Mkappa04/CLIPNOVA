@@ -65,6 +65,17 @@ class Settings(BaseSettings):
     analysis_decoder: str = "cpu"  # cpu | nvdec
     models_path: Path | None = None   # override model cache location (default: <data_dir>/models)
     publishing_enabled: bool = False
+    publish_scheduler_interval_s: int = 30
+
+    # Content generation: "none" = template mode (default, no LLM); "ollama" = optional local LLM
+    llm_provider: str = "none"
+    llm_model: str = "qwen3.5:4b"
+    llm_url: str = "http://127.0.0.1:11434"
+    llm_timeout_s: float = 120.0
+
+    # Optional extra copy of every export package, e.g. a Windows folder:
+    # /mnt/c/Users/<you>/Videos/CLIPNOVA  (so you can upload from the Windows browser)
+    export_copy_dir: Path | None = None
 
     cors_origins: list[str] = ["http://127.0.0.1:5173", "http://localhost:5173"]
 
@@ -103,6 +114,14 @@ class Settings(BaseSettings):
         return self.data_dir / "previews"
 
     @property
+    def exports_dir(self) -> Path:
+        return self.data_dir / "exports"
+
+    @property
+    def secret_key_path(self) -> Path:
+        return self.data_dir / "secret.key"
+
+    @property
     def renders_dir(self) -> Path:
         return self.data_dir / "renders"
 
@@ -112,7 +131,7 @@ class Settings(BaseSettings):
 
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.videos_dir, self.thumbnails_dir, self.logs_dir,
-                  self.cache_dir, self.renders_dir, self.models_dir, self.previews_dir):
+                  self.cache_dir, self.renders_dir, self.models_dir, self.previews_dir, self.exports_dir):
             d.mkdir(parents=True, exist_ok=True)
 
     def validate_security(self) -> None:
