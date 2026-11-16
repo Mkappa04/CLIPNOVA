@@ -122,6 +122,7 @@ def build_ass(cues: list[dict], style: SubtitleStyle, *, position: str = "auto",
     margin_v = place.margin_v
     hl = ass_color(style.highlight)
     pr = ass_color(style.primary)
+    em = ass_color(style.emphasis)
 
     for cue in cues:
         words = [w["word"].upper() if style.uppercase else w["word"] for w in cue["words"]] or \
@@ -133,6 +134,9 @@ def build_ass(cues: list[dict], style: SubtitleStyle, *, position: str = "auto",
         elif style.animation == "pop":
             entry = "{\\fscx88\\fscy88\\t(0,80,\\fscx100\\fscy100)}"
 
+        emph_flags = [bool(w.get("emph")) for w in cue["words"]] if len(cue["words"]) == len(words) else \
+            [False] * len(words)
+
         def render(active: int | None) -> str:
             out_lines = []
             for g in groups:
@@ -143,6 +147,10 @@ def build_ass(cues: list[dict], style: SubtitleStyle, *, position: str = "auto",
                         s = style.highlight_scale
                         grow = f"\\fscx{s}\\fscy{s}" if s != 100 else ""
                         parts.append(f"{{\\c{hl}{grow}}}{w}{{\\c{pr}\\fscx100\\fscy100}}")
+                    elif emph_flags[i]:
+                        s = style.emphasis_scale
+                        grow = f"\\fscx{s}\\fscy{s}" if s != 100 else ""
+                        parts.append(f"{{\\c{em}{grow}}}{w}{{\\c{pr}\\fscx100\\fscy100}}")
                     else:
                         parts.append(w)
                 out_lines.append(" ".join(parts))

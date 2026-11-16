@@ -2,6 +2,7 @@ import type {
   AutomationSettingsT, AutomationStatus, CreatorT, DiscoveryResult, DiscoveryStatus, NotificationT, WatchFolderT, WatchedFileT,
   ClipContent, ExportItem, LlmStatus, Platform, Publication, PublishingStatus, ReviewItem, SocialAccount,
   Cue, EditConfig, EditState, Region, RenderItem, SubtitlePreset, WebcamDetection,
+  BrandKit, BrandSettings, EditPlan, EditingPreset, EditingPresetId,
   AnalysisResponse, Clip, ClipCategory, ClipStatus, ScoringConfig,
   AppSettings, DashboardData, ImportResult, Job, Purpose, Rights, RightsDecision, SystemInfo, Video,
 } from '../types'
@@ -131,6 +132,24 @@ export const api = {
   renderFileUrl: (id: string, download = false) => `/api/renders/${id}/file${download ? '?download=true' : ''}`,
   renderThumbUrl: (id: string) => `/api/renders/${id}/thumbnail`,
   renderSubsUrl: (id: string, format: 'srt' | 'ass') => `/api/renders/${id}/subtitles?format=${format}`,
+
+  // ---- editing presets, AI editing planner, SFX, Brand Kit
+  editingPresets: () => request<EditingPreset[]>('/api/editing/presets'),
+  selectPreset: (clipId: string, preset: EditingPresetId) =>
+    request<EditState>(`/api/clips/${clipId}/preset`, { method: 'PUT', body: JSON.stringify({ preset }) }),
+  planPreview: (clipId: string, config: EditConfig, signal?: AbortSignal) =>
+    request<{ plan: EditPlan; stored: boolean }>(`/api/clips/${clipId}/edit-plan/preview`, { method: 'POST', body: JSON.stringify({ config }), signal }),
+  makePlan: (clipId: string, config: EditConfig) =>
+    request<{ job_id: string }>(`/api/clips/${clipId}/edit-plan`, { method: 'POST', body: JSON.stringify({ force: true, config }) }),
+  sfxLibrary: () => request<{ category: string; available: boolean; source: string; name: string | null }[]>('/api/sfx'),
+  brandKit: () => request<BrandKit>('/api/brand-kit'),
+  saveBrandSettings: (s: BrandSettings) => request<BrandKit>('/api/brand-kit/settings', { method: 'PUT', body: JSON.stringify(s) }),
+  uploadLogo: (file: File) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return request<BrandKit>('/api/brand-kit/logo', { method: 'POST', body: fd })
+  },
+  deleteLogo: () => request<BrandKit>(`/api/brand-kit/logo${qs({ confirm: true })}`, { method: 'DELETE' }),
 
   // ---- approval, export, publishing (Milestone 4)
   approvalQueue: (status: string) => request<ReviewItem[]>(`/api/approval/queue${qs({ status })}`),

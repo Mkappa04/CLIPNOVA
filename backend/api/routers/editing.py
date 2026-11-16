@@ -14,9 +14,12 @@ from backend.core.config import get_settings
 from backend.core.exceptions import ConflictError, NotFoundError, ValidationFailed
 from backend.database.session import get_db
 from backend.editing import service
-from backend.editing.config import LAYOUT_NEEDS_WEBCAM, EditConfig, Region
+from backend.clip_detection.semantic import status as semantic_status
+from backend.editing import effects as sfx_effects
+from backend.editing import presets as edit_presets
+from backend.editing.config import LAYOUT_NEEDS_WEBCAM, EditConfig, PresetId, Region
 from backend.editing.frames import grab_frame
-from backend.editing.renderer import preview_frame, source_cues
+from backend.editing.renderer import get_plan, preview_frame, source_cues
 from backend.editing.webcam import detect_webcam
 from backend.models.entities import ACTIVE_JOB_STATUSES, Clip, Job, Render
 from backend.models.schemas import RenderOut, SubtitlesIn
@@ -51,6 +54,83 @@ def render_out(r: Render) -> RenderOut:
 @router.get("/subtitles/presets")
 def presets() -> list[dict]:
     return [p.as_dict() for p in PRESETS.values()]
+
+
+@router.get("/editing/presets")
+def editing_presets() -> list[dict]:
+    """Gaming Dynamic, Sports Highlights, Podcast Clean (+ custom): description, config values, planner policy."""
+    return [p.model_dump() for p in edit_presets.all_presets().values()]
+
+
+class PresetRequest(BaseModel):
+    preset: PresetId
+
+
+@router.put("/clips/{clip_id}/preset")
+def select_preset(clip_id: str, body: PresetRequest, db: Session = Depends(get_db)) -> dict:
+    """Apply a preset to the clip's saved edit config (layout, webcam and texts are kept)."""
+    clip = _clip(db, clip_id)
+    clip.edit_config = edit_presets.apply_preset(service.effective_config(clip), body.preset).model_dump()
+    db.commit()
+    return get_edit(clip_id, db)
+
+
+@router.get("/sfx")
+def sfx_library() -> list[dict]:
+    return sfx_effects.library()
+
+
+# ---------------------------------------------------------------- AI editing plan
+@router.get("/clips/{clip_id}/edit-plan")
+def get_edit_plan(clip_id: str, db: Session = Depends(get_db)) -> dict:
+    """The stored AI plan (if it still matches the current config) and a fast rules-only preview."""
+    clip = _clip(db, clip_id)
+    cs = service.clip_source(clip, with_logo=False)
+    preview = get_plan(cs, allow_llm=False)
+    stored = clip.edit_plan if clip.edit_plan and clip.edit_plan.get("key") == preview.key else None
+    job = db.scalar(select(Job).where(Job.type.in_(["edit.plan", "render.clip"]),
+                                      Job.status.in_(ACTIVE_JOB_STATUSES),
+                                      Job.payload["clip_id"].as_string() == clip_id))
+    return {"plan": stored or preview.model_dump(), "stored": stored is not None,
+            "stale": bool(clip.edit_plan) and stored is None, "job_id": job.id if job else None,
+            "planner": semantic_status()}
+
+
+class PlanPreviewRequest(BaseModel):
+    config: EditConfig | None = None
+
+
+@router.post("/clips/{clip_id}/edit-plan/preview")
+def preview_edit_plan(clip_id: str, body: PlanPreviewRequest = Body(default_factory=PlanPreviewRequest),
+                      db: Session = Depends(get_db)) -> dict:
+    """Plan for an unsaved config, computed synchronously: the stored AI plan if it matches, else rules only."""
+    clip = _clip(db, clip_id)
+    cs = service.clip_source(clip, body.config, with_logo=False)
+    plan = get_plan(cs, allow_llm=False)
+    return {"plan": plan.model_dump(), "stored": bool(clip.edit_plan and clip.edit_plan.get("key") == plan.key
+                                                       and clip.edit_plan.get("source") == plan.source)}
+
+
+class PlanRequest(BaseModel):
+    force: bool = True
+    config: EditConfig | None = None
+
+
+@router.post("/clips/{clip_id}/edit-plan", status_code=202)
+def make_edit_plan(clip_id: str, body: PlanRequest = Body(default_factory=PlanRequest),
+                   db: Session = Depends(get_db)) -> dict:
+    """Run the AI Editing Planner as a background job (local LLM may take ~20-40 s)."""
+    clip = _clip(db, clip_id)
+    active = db.scalar(select(func.count(Job.id)).where(
+        Job.type.in_(["edit.plan", "render.clip"]), Job.status.in_(ACTIVE_JOB_STATUSES),
+        Job.payload["clip_id"].as_string() == clip_id))
+    if active:
+        raise ConflictError("Un piano o un render per questa clip è già in corso")
+    if body.config is not None:
+        clip.edit_config = body.config.model_dump()
+        db.commit()
+    job_id = job_manager.submit("edit.plan", {"clip_id": clip_id, "force": body.force}, video_id=clip.video_id)
+    return {"job_id": job_id}
 
 
 @router.get("/edit/defaults")

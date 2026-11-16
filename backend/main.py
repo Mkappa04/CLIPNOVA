@@ -16,6 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from backend.api.routers import (
+    brand_kit,
     analysis, analytics, approval, automation, clips, creators, discovery, editing, jobs, publishing, system,
     videos,
 )
@@ -85,6 +86,7 @@ def create_app() -> FastAPI:
     app.include_router(discovery.router)
     app.include_router(creators.router)
     app.include_router(analytics.router)
+    app.include_router(brand_kit.router)
 
     _mount_frontend(app)
     return app

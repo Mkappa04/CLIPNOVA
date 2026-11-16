@@ -30,9 +30,11 @@ def compute_segments(
     duration: float, fps: int, *, words: list[tuple[float, float]] | None = None,
     rms_db: np.ndarray | None = None, window_s: float = 0.5, rms_offset: float = 0.0,
     remove_silences: bool = False, strategy: str = "quiet", min_silence_s: float = 0.8, padding_s: float = 0.15,
+    keep: list[tuple[float, float]] | None = None,
 ) -> list[Segment]:
     """Kept segments. `words` are clip-relative (start, end); `rms_db` covers the whole video
-    with `rms_offset` = clip start in video time."""
+    with `rms_offset` = clip start in video time. `keep`: pauses the editing plan wants to keep
+    (e.g. the dramatic pause before a punchline) — never cut."""
     if not remove_silences or not words:
         return [Segment(0.0, _q(duration, fps), 0.0)]
 
@@ -60,6 +62,10 @@ def compute_segments(
                 return len(seg) > 0 and float(seg.mean()) < threshold
 
             gaps = [g for g in gaps if quiet(*g)]
+
+    if keep:
+        gaps = [g for g in gaps if not any(min(g[1], kb) - max(g[0], ka) > 0.5 * min(g[1] - g[0], kb - ka)
+                                           for ka, kb in keep)]
 
     # Remove each gap minus padding on both sides
     cuts = []

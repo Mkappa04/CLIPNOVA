@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.2.0 — montaggio automatico
+
+- **Preset di editing**: Gaming Dynamic, Sports Highlights, Podcast Clean, cioè parametri dell'editor e regole del
+  planner, personalizzabili in `data/config/editing_presets.json`.
+- **AI Editing Planner**: piano JSON validato (Pydantic) per ogni clip, con zoom leggero, progressivo o rapido,
+  enfasi sui sottotitoli, flash, shake, effetti sonori, pause tenute o tagliate. La scelta esplicita "none" è
+  motivata. Le regole sono sempre disponibili; l'LLM locale (Ollama) sceglie solo tra i momenti candidati. Ci sono
+  limiti di frequenza e durata e un budget per gli SFX. Il piano si vede in una timeline nel Clip Editor.
+- **Inquadratura sullo speaker**: tracking dei volti (YuNet) con scelta di chi parla. Se i volti non sono
+  affidabili si ripiega sull'azione e poi sul centro. Velocità della camera regolabile; Sports la usa più rapida.
+- **Sottotitoli**: Dynamic Captions e Clean Captions, parole chiave in un colore dedicato.
+- **Brand Kit**: upload del logo PNG (validato e ricodificato), posizione, dimensione, opacità, margine, zone
+  sicure delle piattaforme, attivabile per singola clip. Overlay FFmpeg deterministico.
+- **Effetti sonori**: libreria inclusa sintetizzata (CC0) e cartella `data/sfx/` per i tuoi file. Mix con
+  `adelay`/`amix` più limiter, volume regolabile.
+- FPS "come la sorgente", pulsante *Anteprima* (render bozza), *Rigenera* sui render.
+- Migrazione 0006 (tabella `brand_assets`, `clips.edit_plan`), solo additiva. Il backup include logo e SFX.
+
 ## 1.1.0 — clip migliori
 
 - **Analisi semantica con LLM locale** (Ollama, default `qwen3:8b`, ripiego su `qwen3.5:4b`): il parlato viene diviso

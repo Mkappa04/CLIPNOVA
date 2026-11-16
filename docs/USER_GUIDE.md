@@ -20,8 +20,12 @@ Facoltativo: `scripts/install-service.sh` avvia CLIPNOVA automaticamente con WSL
    - Imposta sempre i **diritti** (proprietario, licenza, autorizzazione): senza, l'export resta bloccato.
 2. **Clip Detection**: *Analizza video* → timeline dell'interesse, clip con categoria, score e motivazione.
    Puoi cambiare i pesi e ricalcolare all'istante, correggere i tempi, aggiungere clip a mano.
-3. **Clip Editor**: layout (full, stack, PiP, split), webcam (rilevata o disegnata a mano), smart crop, zoom,
-   sottotitoli (Clean, Gaming, Viral), audio (−14 LUFS, taglio silenzi), intro/outro → *Render*.
+3. **Clip Editor**: scegli il **preset** (Gaming Dynamic, Sports Highlights, Podcast Clean), guarda il **piano
+   dell'AI Editing Planner** (dove zooma, quali parole evidenzia, dove mette un suono, dove *non* fa nulla e perché;
+   *Genera con AI locale* per farlo ragionare con Ollama), poi regola quello che vuoi: layout, webcam, inquadratura
+   (segue l'azione o lo speaker), sottotitoli (Dynamic/Clean Captions), effetti sonori, logo, audio, intro/outro.
+   *Anteprima* = video completo in bozza da guardare subito; *Render* = qualità finale; *Rigenera* su ogni render.
+   Il logo si carica una volta sola in **Brand Kit**.
 4. **Subtitle Editor**: correggi il testo dei sottotitoli; poi rifai il render.
 5. **Approval Center**: guarda il video finale, genera/modifica titolo, caption e hashtag, **Approva**.
 6. **Export**: scegli piattaforme e uso (commerciale o no) → pacchetto con video, testi, sottotitoli e checklist.

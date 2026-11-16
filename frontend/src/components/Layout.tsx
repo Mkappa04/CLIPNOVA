@@ -1,5 +1,5 @@
 import {
-  BarChart3, CheckCircle2, Clapperboard, Compass, Film, FolderSync, Gauge, Captions, Layers, Menu, Rocket, ScanSearch, Settings, Users, X,
+  BarChart3, CheckCircle2, Clapperboard, Compass, Film, FolderSync, Gauge, Captions, Layers, Menu, Rocket, ScanSearch, Settings, Stamp, Users, X,
 } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
@@ -17,6 +17,7 @@ export const NAV = [
   { to: '/editor', label: 'Clip Editor', icon: Clapperboard },
   { to: '/subtitles', label: 'Subtitle Editor', icon: Captions },
   { to: '/render', label: 'Render Queue', icon: Layers },
+  { to: '/brand-kit', label: 'Brand Kit', icon: Stamp },
   { to: '/approval', label: 'Approval Center', icon: CheckCircle2 },
   { to: '/published', label: 'Published Content', icon: Rocket },
   { to: '/discovery', label: 'Discovery', icon: Compass },

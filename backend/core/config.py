@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "CLIPNOVA"
-    version: str = "1.1.0"
+    version: str = "1.2.0"
 
     host: str = "127.0.0.1"
     port: int = 8000
@@ -92,6 +92,10 @@ class Settings(BaseSettings):
     # Embedding model used to learn your taste from approved/rejected clips (multilingual, small)
     preference_embed_model: str = "embeddinggemma"
 
+    # Brand Kit: max logo upload size (MB) and max logo dimensions (px)
+    brand_logo_max_mb: float = 5.0
+    brand_logo_max_px: int = 4096
+
     # Optional extra copy of every export package, e.g. a Windows folder:
     # /mnt/c/Users/<you>/Videos/CLIPNOVA  (so you can upload from the Windows browser)
     export_copy_dir: Path | None = None
@@ -139,6 +143,10 @@ class Settings(BaseSettings):
     @property
     def secret_key_path(self) -> Path:
         return self.data_dir / "secret.key"
+
+    @property
+    def brand_dir(self) -> Path:
+        return self.data_dir / "brand"
 
     @property
     def renders_dir(self) -> Path:

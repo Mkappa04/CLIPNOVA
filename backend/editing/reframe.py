@@ -113,8 +113,14 @@ def camera_path(proxy: Path | None, start: float, end: float, *, crop_w_norm: fl
                 last = arr[i]
     dt = float(np.median(np.diff(times))) if len(times) > 1 else 0.1
     tx = _gauss(tx, 1.0 / dt)
+    pos = virtual_camera(times, tx, half, dead_zone, max_speed)
+    cy = np.clip(_gauss(ty, 1.5 / dt), 0.35, 0.65) if follow_y else np.full_like(pos, 0.5)
+    return CameraPath(times, pos, cy)
 
-    # Virtual camera: dead-zone + speed limit
+
+def virtual_camera(times: np.ndarray, tx: np.ndarray, half: float, dead_zone: float, max_speed: float) -> np.ndarray:
+    """Follow a target x with a dead-zone and a speed limit, then smooth: calm, cinematic pans."""
+    dt = float(np.median(np.diff(times))) if len(times) > 1 else 0.1
     pos = np.empty_like(tx)
     p = float(np.clip(tx[: max(1, int(1.5 / dt))].mean(), half, 1 - half))
     for i, target in enumerate(np.clip(tx, half, 1 - half)):
@@ -123,8 +129,94 @@ def camera_path(proxy: Path | None, start: float, end: float, *, crop_w_norm: fl
             step = np.clip(err - np.sign(err) * dead_zone, -max_speed * dt, max_speed * dt)
             p += float(step)
         pos[i] = p
-    pos = np.clip(_gauss(pos, 0.3 / dt), half, 1 - half)
-    cy = np.clip(_gauss(ty, 1.5 / dt), 0.35, 0.65) if follow_y else np.full_like(pos, 0.5)
+    return np.clip(_gauss(pos, 0.3 / dt), half, 1 - half)
+
+
+# ------------------------------------------------------------------ faces (speaker framing)
+FACE_SAMPLE_FPS = 4.0
+FACE_MIN_COVERAGE = 0.35   # faces in at least 35% of the sampled frames, else not reliable
+
+
+def face_track(src: Path, start: float, end: float, width: int, height: int) -> tuple[np.ndarray, list[list[tuple]], list[np.ndarray]]:
+    """Faces sampled at 4 fps on a 640-px copy: (times, faces per frame [(x,y,w,h,score) normalised], gray frames)."""
+    from backend.editing.frames import FrameReader
+    from backend.editing.webcam import detect_faces
+
+    reader = FrameReader(src, start, max(0.1, end - start), FACE_SAMPLE_FPS, width, height, max_w=640)
+    frames = list(reader)
+    if not frames:
+        return np.array([]), [], []
+    h, w = frames[0].shape[:2]
+    det = detect_faces(frames, min_score=0.7)
+    faces = [[(x / w, y / h, fw / w, fh / h, sc) for (x, y, fw, fh, sc) in fs if fw / w > 0.025] for fs in det]
+    grays = [cv2.cvtColor(f, cv2.COLOR_BGR2GRAY) for f in frames]
+    times = np.arange(len(frames)) / FACE_SAMPLE_FPS
+    return times, faces, grays
+
+
+def _mouth_motion(prev: np.ndarray, cur: np.ndarray, face: tuple) -> float:
+    """Pixel change in the lower half of a face box: a talking mouth moves, a listener's mostly doesn't."""
+    H, W = cur.shape
+    x, y, w, h = face[0] * W, face[1] * H, face[2] * W, face[3] * H
+    x0, x1 = int(max(0, x + 0.2 * w)), int(min(W, x + 0.8 * w))
+    y0, y1 = int(max(0, y + 0.55 * h)), int(min(H, y + 1.0 * h))
+    if x1 - x0 < 3 or y1 - y0 < 3:
+        return 0.0
+    return float(np.mean(np.abs(cur[y0:y1, x0:x1].astype(np.int16) - prev[y0:y1, x0:x1].astype(np.int16))))
+
+
+def faces_path(times: np.ndarray, faces: list[list[tuple]], grays: list[np.ndarray], *, crop_w_norm: float,
+               dead_zone: float = 0.06, max_speed: float = 0.15) -> CameraPath | None:
+    """Speaker framing. None when faces are not reliable enough (caller falls back to action/centre).
+
+    One face, or several that fit together in the crop → frame them all. Otherwise follow the
+    active speaker (largest mouth motion), switching only after it stays dominant for ~1 s."""
+    n = len(times)
+    if n < 3 or crop_w_norm >= 0.999:
+        return None
+    coverage = sum(1 for f in faces if f) / n
+    if coverage < FACE_MIN_COVERAGE:
+        return None
+    half = min(0.5, crop_w_norm / 2)
+    tx = np.full(n, np.nan)
+    ty = np.full(n, np.nan)
+    current: tuple | None = None
+    challenger_count = 0
+    for i, fs in enumerate(faces):
+        if not fs:
+            continue
+        x0 = min(f[0] for f in fs)
+        x1 = max(f[0] + f[2] for f in fs)
+        if x1 - x0 <= crop_w_norm * 0.85:          # everyone fits
+            tx[i] = (x0 + x1) / 2
+            ty[i] = float(np.mean([f[1] + f[3] / 2 for f in fs]))
+            continue
+        motion = [(_mouth_motion(grays[i - 1], grays[i], f) if i > 0 else 0.0) for f in fs]
+        best = fs[int(np.argmax(motion))]
+        if current is None:
+            current = max(fs, key=lambda f: f[2] * f[3])
+        # match the current speaker to this frame's faces (nearest centre)
+        cur = min(fs, key=lambda f: abs(f[0] + f[2] / 2 - current[0] - current[2] / 2))
+        if best is not cur and max(motion) > 1.5 * motion[fs.index(cur)] + 0.5:
+            challenger_count += 1
+            if challenger_count >= int(FACE_SAMPLE_FPS):  # dominant for ~1 s → cut to the new speaker
+                cur, challenger_count = best, 0
+        else:
+            challenger_count = 0
+        current = cur
+        tx[i] = cur[0] + cur[2] / 2
+        ty[i] = cur[1] + cur[3] / 2
+    for arr in (tx, ty):
+        last = np.nan
+        first = next((v for v in arr if not np.isnan(v)), 0.5)
+        for i in range(n):
+            if np.isnan(arr[i]):
+                arr[i] = first if np.isnan(last) else last
+            else:
+                last = arr[i]
+    dt = 1.0 / FACE_SAMPLE_FPS
+    pos = virtual_camera(times, _gauss(tx, 0.5 / dt), half, dead_zone, max_speed)
+    cy = np.clip(_gauss(ty, 1.0 / dt) + 0.05, 0.35, 0.65)  # a little headroom above the face
     return CameraPath(times, pos, cy)
 
 

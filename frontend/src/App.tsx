@@ -21,6 +21,7 @@ const Discovery = page(() => import('./pages/Discovery'), 'Discovery')
 const Creators = page(() => import('./pages/Creators'), 'Creators')
 const Analytics = page(() => import('./pages/Analytics'), 'Analytics')
 const Settings = page(() => import('./pages/Settings'), 'Settings')
+const BrandKit = page(() => import('./pages/BrandKit'), 'BrandKit')
 
 export default function App() {
   const location = useLocation()
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="/editor" element={<ClipEditor />} />
             <Route path="/subtitles" element={<SubtitleEditor />} />
             <Route path="/render" element={<RenderQueue />} />
+            <Route path="/brand-kit" element={<BrandKit />} />
             <Route path="/approval" element={<ApprovalCenter />} />
             <Route path="/published" element={<PublishedContent />} />
             <Route path="/discovery" element={<Discovery />} />

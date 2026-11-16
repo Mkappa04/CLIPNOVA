@@ -170,7 +170,7 @@ export function PresetPicker({ presets, value, onChange }: { presets: SubtitlePr
           <span className="block text-sm font-black tracking-wide" style={{ color: p.primary, WebkitTextStroke: '0.6px #000', textShadow: '0 2px 0 #000' }}>
             {p.uppercase ? 'CIAO ' : 'Ciao '}<span style={{ color: p.highlight }}>{p.uppercase ? 'RAGA' : 'raga'}</span>
           </span>
-          <span className="mt-1 block text-[10px] text-zinc-400">{p.name.replace('CLIPNOVA ', '')} · {p.font}</span>
+          <span className="mt-1 block text-[10px] text-zinc-400" title={p.description}>{p.name.replace('CLIPNOVA ', '')} · {p.font}</span>
         </button>
       ))}
     </div>

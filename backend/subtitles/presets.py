@@ -38,6 +38,9 @@ class SubtitleStyle:
     position: str       # default vertical position: bottom | middle
     animation: str      # none | pop | bounce
     highlight_scale: int  # % scale of the active word
+    emphasis: str = "#FFD60A"   # colour of the key words chosen by the AI planner (always visible in the cue)
+    emphasis_scale: int = 106
+    description: str = ""
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -45,20 +48,23 @@ class SubtitleStyle:
 
 PRESETS: dict[str, SubtitleStyle] = {
     "clean": SubtitleStyle(
-        id="clean", name="CLIPNOVA Clean", font="Lato", size=66, bold=True, uppercase=False,
+        id="clean", name="Clean Captions", font="Lato", size=66, bold=True, uppercase=False,
         primary="#FFFFFF", highlight="#FFE45C", outline_color="#000000", outline=4, shadow=1.5,
         shadow_color="#000000", max_words=7, max_chars=28, max_lines=2, position="bottom",
-        animation="none", highlight_scale=100),
+        animation="none", highlight_scale=100, emphasis="#5EEAD4", emphasis_scale=100,
+        description="Leggibili e sobri: 2 righe in basso, parola attiva colorata, nessuna animazione"),
     "gaming": SubtitleStyle(
-        id="gaming", name="CLIPNOVA Gaming", font="Anton", size=104, bold=False, uppercase=True,
+        id="gaming", name="Dynamic Captions", font="Anton", size=104, bold=False, uppercase=True,
         primary="#FFFFFF", highlight="#22D3EE", outline_color="#000000", outline=6, shadow=4,
         shadow_color="#7C3AED", max_words=3, max_chars=18, max_lines=1, position="middle",
-        animation="pop", highlight_scale=114),
+        animation="pop", highlight_scale=114, emphasis="#FACC15", emphasis_scale=108,
+        description="Animati: 3 parole alla volta al centro, pop, parola attiva ingrandita"),
     "viral": SubtitleStyle(
-        id="viral", name="CLIPNOVA Viral", font="Luckiest Guy", size=108, bold=False, uppercase=True,
+        id="viral", name="Viral (bounce)", font="Luckiest Guy", size=108, bold=False, uppercase=True,
         primary="#FFFFFF", highlight="#A3FF12", outline_color="#000000", outline=8, shadow=5,
         shadow_color="#000000", max_words=2, max_chars=14, max_lines=1, position="middle",
-        animation="bounce", highlight_scale=118),
+        animation="bounce", highlight_scale=118, emphasis="#FF4D6D", emphasis_scale=110,
+        description="Massimo impatto: 2 parole, rimbalzo, colori accesi"),
 }
 
 

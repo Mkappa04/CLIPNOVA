@@ -225,10 +225,12 @@ def run_render_job(ctx, clip_id: str) -> dict:
             if c is not None:
                 c.status = clip_status
 
-    ctx.progress(0.01, "Preparazione render", force=True)
+    ctx.progress(0.01, "AI Editing Planner: analisi della clip", force=True)
     try:
-        stats = render(cs, out_dir, on_progress=lambda p, m: ctx.progress(0.02 + 0.95 * p, m),
-                       should_cancel=lambda: ctx.cancelled)
+        edit = plan_and_store(cs, clip_id)
+        ctx.progress(0.04, f"Piano pronto ({edit.source}): {edit.summary()['effects'] or 'nessun effetto'}", force=True)
+        stats = render(cs, out_dir, on_progress=lambda p, m: ctx.progress(0.05 + 0.92 * p, m),
+                       should_cancel=lambda: ctx.cancelled, edit=edit)
     except RenderCancelled as e:
         finish(RenderStatus.CANCELLED, prev_status, error="Annullato")
         _shutil.rmtree(out_dir, ignore_errors=True)
@@ -251,6 +253,39 @@ def run_render_job(ctx, clip_id: str) -> dict:
            height=stats.get("height") or 1920, encoder=stats.get("encoder", ""), stats=stats)
     return {"message": f"Render completato ({stats.get('encoder')}, {stats.get('speed_x')}x)", "render_id": render_id,
             **{k: stats[k] for k in ("encoder", "elapsed_s", "speed_x", "duration", "file_size") if k in stats}}
+
+
+def plan_and_store(cs, clip_id: str):
+    """AI Editing Planner for a clip (local LLM when enabled/available, else rules); saved on the clip."""
+    from backend.editing.renderer import get_plan
+    from backend.models.entities import Clip
+
+    edit = get_plan(cs, allow_llm=True)
+    with session_scope() as db:
+        c = db.get(Clip, clip_id)
+        if c is not None:
+            c.edit_plan = edit.model_dump()
+    return edit
+
+
+@job_manager.register("edit.plan")
+def edit_plan_job(ctx: JobContext) -> dict:
+    from backend.editing import service as edit_service
+    from backend.models.entities import Clip
+
+    clip_id = ctx.payload["clip_id"]
+    with session_scope() as db:
+        clip = db.get(Clip, clip_id)
+        if clip is None:
+            raise RuntimeError(f"Clip {clip_id} not found")
+        if ctx.payload.get("force"):
+            clip.edit_plan = None
+        cs = edit_service.clip_source(clip, with_logo=False)
+        cs.stored_plan = None if ctx.payload.get("force") else cs.stored_plan
+    ctx.progress(0.1, "AI Editing Planner: analisi della clip", force=True)
+    edit = plan_and_store(cs, clip_id)
+    summ = edit.summary()
+    return {"message": f"Piano {edit.source}: {summ['effects'] or 'nessun effetto'}", "plan": summ}
 
 
 # ---------------------------------------------------------------- publishing (Milestone 4)

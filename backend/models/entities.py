@@ -185,6 +185,8 @@ class Clip(Base):
     edit_config: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     # Subtitle cues in clip-relative seconds (None = generate from transcript)
     subtitles: Mapped[list[dict[str, Any]] | None] = mapped_column(JSON, nullable=True)
+    # Last AI Editing Planner result (EditPlan JSON, see backend/editing/planner.py); reused while its key matches
+    edit_plan: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     # Social copy: {language, title, hook, caption, description, hashtags, cta, generated_by}
     content: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     review_note: Mapped[str] = mapped_column(Text, default="")
@@ -307,6 +309,23 @@ class Render(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     clip: Mapped[Clip] = relationship(back_populates="renders")
+
+
+class BrandAsset(Base):
+    """A Brand Kit file (logo). Stored re-encoded under data/brand, never served by path."""
+
+    __tablename__ = "brand_assets"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    owner: Mapped[str] = mapped_column(String(64), default="local", index=True)  # single local profile today
+    kind: Mapped[str] = mapped_column(String(20), default="logo")
+    original_name: Mapped[str] = mapped_column(String(255), default="")
+    stored_name: Mapped[str] = mapped_column(String(80))
+    width: Mapped[int] = mapped_column(Integer)
+    height: Mapped[int] = mapped_column(Integer)
+    file_size: Mapped[int] = mapped_column(Integer)
+    has_alpha: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class AnalysisStatus(str, Enum):

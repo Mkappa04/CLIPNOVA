@@ -251,6 +251,40 @@ frasi davvero dette. Le clip che **approvi/esporti o rifiuti** insegnano a CLIPN
 `embeddinggemma` + esempi per l'LLM): servono almeno 2 clip approvate; *Clip Detection → Riordina con i miei gusti*.
 Limite onesto: un modello da 4–8B giudica male il "divertente" in assoluto; i tuoi esempi sono il segnale più affidabile.
 
+### Montaggio automatico (1.2): preset, AI Editing Planner, Brand Kit
+Nel **Clip Editor** scegli un preset e CLIPNOVA decide da solo come montare la clip:
+
+| Preset | Pensato per | Cosa fa |
+|---|---|---|
+| **Gaming Dynamic** | gameplay, streamer | Dynamic Captions, parole chiave evidenziate, zoom rapidi su urla/sorprese, zoom progressivi verso il culmine, flash/shake solo sugli impatti estremi, SFX rari, pause silenziose tagliate |
+| **Sports Highlights** | calcio e altri sport | camera veloce che segue l'azione, zoom misurati, titolo iniziale, sottotitoli puliti, **nessun taglio** dentro l'azione, nessun replay inventato |
+| **Podcast Clean** | podcast, interviste, parlato | inquadratura sullo speaker (volti YuNet, segue chi parla), Clean Captions, zoom leggerissimi, pause rimosse, niente effetti superflui |
+
+- **AI Editing Planner** (`backend/editing/planner.py`): raccoglie i *momenti candidati* (picchi audio con/senza
+  voce, parole chiave di reazione, la battuta chiave dell'analisi semantica, il picco della clip, lampi e movimento)
+  e decide per ognuno un effetto **oppure `none`**. Le regole del preset danno sempre un piano; se Ollama è attivo
+  l'LLM locale (gratuito) ragiona sulla trascrizione e sceglie *tra i candidati*, quindi non può inventare tempi.
+  Il piano è JSON validato con Pydantic (tempi dentro la clip, intensità 0–1, nessuna sovrapposizione) e passa
+  sempre dai limiti del preset: effetti al minuto, distanza minima, durata massima, budget SFX. Tiene anche le
+  **pause drammatiche** prima di una battuta. Il piano si vede in una timeline con il motivo di ogni scelta.
+- **Zoom**: leggero, progressivo, rapido; **effetti**: flash, shake; tutti dosati dall'intensità del piano.
+- **Sottotitoli**: *Dynamic Captions* (animati) o *Clean Captions* (leggibili), parola pronunciata evidenziata,
+  parole chiave scelte dal planner in un colore dedicato. Si possono disattivare.
+- **Brand Kit** (`/brand-kit`): carichi un PNG (controllato davvero, ricodificato, max 5 MB) e scegli angolo,
+  dimensione, opacità, margine; il logo resta fuori dalle zone dell'interfaccia di TikTok/Reels/Shorts e non
+  copre la webcam PiP o i sottotitoli in alto. Lo applica FFmpeg (`overlay`), mai l'AI.
+- **Effetti sonori**: whoosh, impact, pop, riser, ding. Quelli inclusi sono **sintetizzati dal codice**
+  (`assets/sfx`, CC0, nessun campione di terzi). I tuoi file (con diritti) in `data/sfx/<categoria>/` li sostituiscono.
+- **FPS**: "Come la sorgente" (24/25/30/50/60 più vicino). NVENC con fallback libx264 su CPU.
+- **Anteprima**: il pulsante *Anteprima* fa un render completo in qualità bozza da riprodurre nella pagina;
+  *Rigenera* e download MP4 su ogni render.
+- I preset si personalizzano senza toccare il codice in `data/config/editing_presets.json`, ad esempio
+  `{"gaming_dynamic": {"policy": {"max_effects_per_min": 5}, "config": {"sfx": false}}}`.
+
+Limiti onesti: il tracking segue movimento o volti, non riconosce la palla; il "chi parla" in Podcast Clean è
+stimato dal movimento della bocca (niente diarizzazione); l'LLM locale tende a essere parco di effetti (scelta
+voluta: meglio "none" che effetti a caso). Il piano con LLM richiede ~35–40 s per clip con `qwen3:8b`.
+
 ### Note tecniche: crash CUDA della trascrizione
 Su questo PC (RTX 3060 Laptop, driver Windows 610.74, WSL 2) CTranslate2 va in errore CUDA
 (`cudaErrorIllegalAddress` / `IllegalInstruction`) dopo decine di secondi di inferenza continua su audio reale,

@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Backup of CLIPNOVA state (NOT the videos): database, credentials key, .env, consent evidence, custom lexicon.
+# Backup of CLIPNOVA state (NOT the videos): database, credentials key, .env, consent evidence, custom lexicon,
+# Brand Kit logo, your own sound effects.
 # Usage: scripts/backup.sh [destination_dir]   (default: ./backups)
 # Restore: stop CLIPNOVA, extract the archive in the project folder, start again.
 set -euo pipefail
@@ -18,7 +19,7 @@ with dst:
     src.backup(dst)
 src.close(); dst.close()
 PY
-for item in data/secret.key data/evidence data/config .env; do
+for item in data/secret.key data/evidence data/config data/brand data/sfx .env; do
   [[ -e "$ROOT/$item" ]] && cp -a "$ROOT/$item" "$tmp/$item"
 done
 archive="$dest/clipnova-backup-$stamp.tar.gz"

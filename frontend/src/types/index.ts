@@ -251,9 +251,17 @@ export interface Region {
   confidence?: number
 }
 
+export type EditingPresetId = 'custom' | 'gaming_dynamic' | 'sports_highlights' | 'podcast_clean'
+export type FpsChoice = 'auto' | 24 | 25 | 30 | 50 | 60
+
 export interface EditConfig {
+  preset: EditingPresetId
+  intensity: number
+  planner: 'auto' | 'rules'
   layout: Layout
   crop_mode: 'smart' | 'center' | 'fit'
+  subject: 'action' | 'faces' | 'auto'
+  follow_speed: number
   webcam_region: Region | null
   hide_webcam_in_gameplay: boolean
   pip_corner: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
@@ -262,6 +270,11 @@ export interface EditConfig {
   zoom: boolean
   zoom_strength: number
   transitions: boolean
+  effects: boolean
+  caption_emphasis: boolean
+  sfx: boolean
+  sfx_volume: number
+  logo: boolean
   remove_silences: boolean
   silence_strategy: 'quiet' | 'no_speech'
   min_silence_s: number
@@ -280,8 +293,57 @@ export interface EditConfig {
   outro: boolean
   outro_text: string
   outro_duration: number
-  fps: 30 | 60
+  fps: FpsChoice
   quality: 'draft' | 'standard' | 'high'
+}
+
+export type PlanEffect = 'none' | 'subtle_zoom' | 'progressive_zoom' | 'punch_zoom' | 'caption_emphasis' | 'flash' | 'shake'
+
+export interface EditingPreset {
+  id: EditingPresetId
+  name: string
+  description: string
+  features: string[]
+  config: Partial<EditConfig>
+  policy: { allowed_effects: PlanEffect[]; max_effects_per_min: number; min_gap_s: number; sfx_per_min: number }
+}
+
+export interface PlanSegment {
+  start: number
+  end: number
+  effect: PlanEffect
+  intensity: number
+  reason: string
+  sfx: { category: string; volume: number; at: number } | null
+}
+
+export interface EditPlan {
+  preset: string
+  source: 'rules' | 'llm'
+  duration: number
+  segments: PlanSegment[]
+  emphasis: { start: number; end: number; word: string; reason: string }[]
+  pauses: { start: number; end: number; action: 'cut' | 'keep'; reason: string }[]
+  candidates: { id: number; t: number; kind: string; strength: number; evidence: string }[]
+  notes: string[]
+  key: string
+}
+
+export interface BrandSettings {
+  enabled: boolean
+  position: 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left'
+  size: number
+  opacity: number
+  margin: number
+  safe_area: boolean
+}
+
+export interface BrandKit {
+  settings: BrandSettings
+  logo: { id: string; original_name: string; width: number; height: number; file_size: number; has_alpha: boolean; created_at: string; url: string } | null
+  placement: { x: number; y: number; w: number; h: number; corner: string; frame: [number, number]; warnings: string[] } | null
+  warnings: string[]
+  limits: { max_mb: number; max_px: number; format: string }
 }
 
 export interface EditState {
@@ -294,6 +356,7 @@ export interface EditState {
 export interface SubtitlePreset {
   id: SubtitlePresetId
   name: string
+  description?: string
   font: string
   size: number
   uppercase: boolean
@@ -318,7 +381,13 @@ export interface RenderItem {
   height: number
   encoder: string
   config: Partial<EditConfig>
-  stats: { warnings?: string[]; cut_seconds?: number; speed_x?: number; elapsed_s?: number; cues?: number; layout?: string }
+  stats: {
+    warnings?: string[]; cut_seconds?: number; speed_x?: number; elapsed_s?: number; cues?: number; layout?: string
+    preset?: EditingPresetId; tracking?: string; fps?: number
+    plan?: { source: string; effects: Record<string, number>; emphasis: number; sfx: number; kept_pauses: number }
+    sfx?: { t: number; category: string; volume: number }[]
+    logo?: { corner: string } | null
+  }
   error: string | null
   created_at: string
   finished_at: string | null
