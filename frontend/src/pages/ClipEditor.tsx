@@ -3,7 +3,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { EditingPresetPicker, PlanPanel, PlanStrip, usePlanPreview } from '../components/EditingPanels'
+import { EditingPresetPicker, MOOD_LABEL, MusicPanel, PlanPanel, PlanStrip, STYLE_LABEL, usePlanPreview } from '../components/EditingPanels'
 import { LayoutPicker, PresetPicker, Section, Segmented, Slider, Toggle, WebcamSelector } from '../components/EditorControls'
 import { JobList } from '../components/JobList'
 import { CategoryBadge } from '../components/TimelineChart'
@@ -16,10 +16,14 @@ import { toast } from '../stores/toastStore'
 import type { EditConfig, EditingPreset, Region, RenderItem } from '../types'
 
 const EFFECT_SHORT: Record<string, string> = {
-  subtle_zoom: 'zoom', progressive_zoom: 'zoom progr.', punch_zoom: 'zoom rapido', caption_emphasis: 'enfasi', flash: 'flash', shake: 'shake',
+  subtle_zoom: 'zoom', progressive_zoom: 'zoom progr.', punch_zoom: 'zoom rapido', caption_emphasis: 'enfasi', flash: 'flash', shake: 'shake', glitch: 'glitch',
 }
+const LOOKS: { value: EditConfig['look']; label: string }[] = [
+  { value: 'auto', label: 'Auto' }, { value: 'none', label: 'Nessuno' }, { value: 'cinematic', label: 'Cinema' }, { value: 'teal_orange', label: 'Teal & orange' },
+  { value: 'warm', label: 'Caldo' }, { value: 'cool', label: 'Freddo' }, { value: 'punchy', label: 'Deciso' }, { value: 'vivid', label: 'Vivido' }, { value: 'bw', label: 'B/N' },
+]
 const PRESET_SHORT: Record<string, string> = {
-  gaming_dynamic: 'Gaming', sports_highlights: 'Sports', podcast_clean: 'Podcast', custom: 'Manuale',
+  gaming_dynamic: 'Gaming', gaming_cinematic: 'Cinematic', sports_highlights: 'Sports', podcast_clean: 'Podcast', storytelling: 'Story', custom: 'Manuale',
 }
 // platform UI zones on 1080x1920 (same values the subtitle engine respects)
 const SAFE = { top: 220 / 1920, bottom: 480 / 1920, side: 90 / 1080 }
@@ -54,6 +58,7 @@ export function RenderCard({ r, onDeleted, onRegenerate }: { r: RenderItem; onDe
             {r.stats.plan.source === 'llm' ? 'AI' : 'Regole'}:{' '}
             {Object.entries(r.stats.plan.effects).map(([k, v]) => `${v}× ${EFFECT_SHORT[k] ?? k}`).join(', ') || 'nessun effetto'}
             {!!r.stats.sfx?.length && ` · ${r.stats.sfx.length} SFX`}{r.stats.logo && ' · logo'}{r.stats.tracking === 'faces' && ' · segue il volto'}
+            {!!r.stats.time_effects?.length && ` · ${r.stats.time_effects.length}× tempo`}{r.stats.music && ` · ♪ ${r.stats.music.mood}`}
           </p>
         )}
         {!!r.stats.warnings?.length && <p className="text-warn">⚠ {r.stats.warnings.join(' · ')}</p>}
@@ -77,7 +82,7 @@ const TABS = [
   { id: 'frame', label: 'Inquadratura', icon: Crop },
   { id: 'subs', label: 'Sottotitoli', icon: Type },
   { id: 'audio', label: 'Audio', icon: Music2 },
-  { id: 'brand', label: 'Logo e titoli', icon: Stamp },
+  { id: 'brand', label: 'Grafiche e logo', icon: Stamp },
   { id: 'output', label: 'Output', icon: Settings2 },
 ] as const
 
@@ -157,7 +162,10 @@ export function ClipEditor() {
       reloadJobs()
     } catch (e) { toast.error(e) }
   }
-  const pickPreset = (p: EditingPreset) => cfg && setCfg({ ...cfg, ...p.config, preset: p.id })
+  const pickPreset = (p: EditingPreset) => cfg && setCfg({ ...cfg, ...p.config, preset: p.id, disabled_items: [] })
+  const toggleItem = (id: string) => cfg && setCfg({
+    ...cfg, disabled_items: cfg.disabled_items.includes(id) ? cfg.disabled_items.filter((x) => x !== id) : [...cfg.disabled_items, id],
+  })
 
   // keyboard: S save · P quick preview · R render · ←/→ scrub (Shift = 2 s)
   const keys = useRef({ save, startRender, dirty, busyJob, t, dur: clip?.duration ?? 0 })
@@ -206,6 +214,8 @@ export function ClipEditor() {
               <CategoryBadge category={clip.category} />
               <StatusBadge status={clip.status} />
               {presetName && <span className="font-mono text-[10px] uppercase tracking-wider text-tally-400">{presetName}</span>}
+              {plan?.director && <span className="font-mono text-[10px] uppercase tracking-wider text-graphite-400">stile {STYLE_LABEL[plan.director.style]}</span>}
+              {plan?.music && <span className="font-mono text-[10px] uppercase tracking-wider text-violet-300">♪ {MOOD_LABEL[plan.music.mood]}</span>}
               {dirty && <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-warn">● non salvato</span>}
             </div>
             <div className="mx-auto w-full max-w-[340px]">
@@ -235,8 +245,8 @@ export function ClipEditor() {
                 </button>
                 <span className="timecode">{clip.duration.toFixed(1)}s</span>
               </div>
-              <PlanStrip plan={plan} duration={clip.duration} t={t} onSeek={setT} />
-              <p className="text-[11px] text-graphite-500">Trascina sulla timeline o usa <span className="kbd">←</span> <span className="kbd">→</span> per scorrere. Il fotogramma mostra le impostazioni correnti; zoom e suoni si vedono nel render.</p>
+              <PlanStrip plan={plan} duration={clip.duration} t={t} onSeek={setT} disabled={cfg.disabled_items} />
+              <p className="text-[11px] text-graphite-500">Trascina sulla timeline o usa <span className="kbd">←</span> <span className="kbd">→</span> per scorrere. Il fotogramma mostra inquadratura, look, sottotitoli e grafiche; movimento, tempo e suoni si vedono nell'anteprima renderizzata.</p>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
@@ -294,16 +304,24 @@ export function ClipEditor() {
                       <Toggle label="Effetti visivi (flash, shake)" checked={cfg.effects} onChange={(v) => set('effects', v)} hint="Solo sugli impatti più forti" />
                       <Toggle label="Evidenzia le parole chiave" checked={cfg.caption_emphasis} onChange={(v) => set('caption_emphasis', v)} />
                       <Toggle label="Effetti sonori contestuali" checked={cfg.sfx} onChange={(v) => set('sfx', v)} hint="Libreria inclusa (CC0) o tuoi file" />
+                      <Toggle label="Slow motion, speed ramp, fermo immagine" checked={cfg.time_effects} onChange={(v) => set('time_effects', v)} hint="Solo su momenti forti senza parlato" />
+                      <Toggle label="Titoli e scritte animate" checked={cfg.motion_graphics} onChange={(v) => set('motion_graphics', v)} hint="Titolo di contesto, parole sul momento" />
+                      <Toggle label="Musica di sottofondo" checked={cfg.music === 'auto'} onChange={(v) => set('music', v ? 'auto' : 'off')} hint="Scelta dal regista, abbassata sotto il parlato" />
+                      <Toggle label="Transizioni sui tagli" checked={cfg.transitions} onChange={(v) => set('transitions', v)} />
                     </div>
                     {cfg.zoom && <Slider label="Zoom massimo" value={cfg.zoom_strength} min={1} max={1.6} step={0.01} onChange={(v) => set('zoom_strength', v)} fmt={(v) => `${v.toFixed(2)}×`} />}
+                  </Section>
+                  <Section title="Look">
+                    <Segmented value={cfg.look} onChange={(v) => set('look', v)} options={LOOKS} />
+                    <Toggle label="Vignettatura del look" checked={cfg.vignette} onChange={(v) => set('vignette', v)} />
                   </Section>
                 </TabsContent>
 
                 <TabsContent value="plan" className="space-y-6">
-                  <Section title="AI Editing Planner" right={<span className="text-xs text-graphite-500">decide dove serve un effetto, e dove no</span>}>
+                  <Section title="AI Video Director" right={<span className="text-xs text-graphite-500">ogni intervento ha un motivo; togli la spunta per escluderlo</span>}>
                     <Segmented value={cfg.planner} onChange={(v) => set('planner', v)}
                       options={[{ value: 'auto', label: 'AI locale + regole' }, { value: 'rules', label: 'Solo regole (istantaneo)' }]} />
-                    <PlanPanel clipId={clip.id} cfg={cfg} plan={plan} stored={stored} busy={planBusy} planJob={planJob} onJob={reloadJobs} />
+                    <PlanPanel clipId={clip.id} cfg={cfg} plan={plan} stored={stored} busy={planBusy} planJob={planJob} onJob={reloadJobs} onToggle={toggleItem} />
                   </Section>
                 </TabsContent>
 
@@ -349,6 +367,19 @@ export function ClipEditor() {
                           options={[{ value: 'auto', label: 'Auto' }, { value: 'top', label: 'Alto' }, { value: 'middle', label: 'Centro' }, { value: 'bottom', label: 'Basso' }]} />
                       </Field>
                       <Slider label="Dimensione" value={cfg.subtitle_scale} min={0.6} max={1.6} step={0.05} onChange={(v) => set('subtitle_scale', v)} fmt={(v) => `${Math.round(v * 100)}%`} />
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Font">
+                          <select className="input" value={cfg.subtitle_font} onChange={(e) => set('subtitle_font', e.target.value as EditConfig['subtitle_font'])}>
+                            <option value="preset">Del preset</option><option value="Anton">Anton</option><option value="Luckiest Guy">Luckiest Guy</option><option value="Lato">Lato</option>
+                          </select>
+                        </Field>
+                        <Field label="Animazione">
+                          <Segmented value={cfg.subtitle_animation} onChange={(v) => set('subtitle_animation', v)}
+                            options={[{ value: 'preset', label: 'Preset' }, { value: 'none', label: 'Nessuna' }, { value: 'pop', label: 'Pop' }, { value: 'bounce', label: 'Bounce' }]} />
+                        </Field>
+                        <ColorField label="Colore testo" value={cfg.subtitle_color} onChange={(v) => set('subtitle_color', v)} />
+                        <ColorField label="Colore parola attiva" value={cfg.subtitle_highlight_color} onChange={(v) => set('subtitle_highlight_color', v)} />
+                      </div>
                       <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
                         <Toggle label="Evidenzia la parola pronunciata" checked={cfg.highlight_words} onChange={(v) => set('highlight_words', v)} />
                         <Toggle label="Evidenzia le parole chiave" checked={cfg.caption_emphasis} onChange={(v) => set('caption_emphasis', v)} hint="Scelte dal planner, colore dedicato" />
@@ -358,7 +389,14 @@ export function ClipEditor() {
                 </TabsContent>
 
                 <TabsContent value="audio" className="space-y-6">
-                  <Section title="Audio">
+                  <Section title="Musica" right={<Link to="/audio" className="link text-xs">Libreria audio</Link>}>
+                    <MusicPanel cfg={cfg} plan={plan} set={set} />
+                    {cfg.music === 'auto' && <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+                      <Slider label="Volume musica" value={cfg.music_volume} min={0} max={1} step={0.05} onChange={(v) => set('music_volume', v)} fmt={(v) => v === 0 ? 'muta' : `${v >= 0.5 ? '+' : ''}${(20 * Math.log10(v / 0.5)).toFixed(0)} dB`} />
+                      <Slider label="Abbassa sotto il parlato" value={cfg.music_ducking} min={0} max={1} step={0.05} onChange={(v) => set('music_ducking', v)} fmt={(v) => `${Math.round(v * 100)}%`} />
+                    </div>}
+                  </Section>
+                  <Section title="Audio originale">
                     <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
                       <Toggle label={`Normalizza loudness (${cfg.target_lufs} LUFS)`} checked={cfg.normalize_audio} onChange={(v) => set('normalize_audio', v)} hint="Standard social: −14 LUFS" />
                       <Toggle label="Riduzione rumore (FFT)" checked={cfg.denoise} onChange={(v) => set('denoise', v)} />
@@ -374,6 +412,10 @@ export function ClipEditor() {
                     <Toggle label="Effetti sonori contestuali" checked={cfg.sfx} onChange={(v) => set('sfx', v)} hint="Solo dove il planner li ritiene utili; cartella data/sfx/ per i tuoi file" />
                     {cfg.sfx && <Slider label="Volume SFX" value={cfg.sfx_volume} min={0} max={1} step={0.05} onChange={(v) => set('sfx_volume', v)} fmt={(v) => `${Math.round(v * 100)}%`} />}
                   </Section>
+                  {cfg.time_effects && <Section title="Audio nello slow motion">
+                    <Segmented value={cfg.slowmo_audio} onChange={(v) => set('slowmo_audio', v)}
+                      options={[{ value: 'muffle', label: 'Ovattato (cinema)' }, { value: 'tempo', label: 'Rallentato' }, { value: 'mute', label: 'Muto' }]} />
+                  </Section>}
                 </TabsContent>
 
                 <TabsContent value="brand" className="space-y-6">
@@ -387,6 +429,12 @@ export function ClipEditor() {
                         </div>
                       </div>
                     ) : <p className="text-sm text-graphite-400">Nessun logo: caricalo nel <Link to="/brand-kit" className="link">Brand Kit</Link>.</p>}
+                  </Section>
+                  <Section title="Titoli e scritte animate">
+                    <Toggle label="Lascia decidere al regista" checked={cfg.motion_graphics} onChange={(v) => set('motion_graphics', v)}
+                      hint="Titolo iniziale se la clip ha bisogno di contesto, una parola detta sul momento forte. Mai testo inventato." />
+                    <Toggle label="Watermark testuale del Brand Kit" checked={cfg.watermark} onChange={(v) => set('watermark', v)}
+                      hint={brand?.settings.watermark_text ? `“${brand.settings.watermark_text}”` : 'Imposta il testo nel Brand Kit'} />
                   </Section>
                   <Section title="Intro e outro">
                     <div className="grid gap-6 sm:grid-cols-2">
@@ -419,5 +467,17 @@ export function ClipEditor() {
         </div>
       )}
     </>
+  )
+}
+
+function ColorField({ label, value, onChange }: { label: string; value: string | null; onChange: (v: string | null) => void }) {
+  return (
+    <Field label={label}>
+      <div className="flex items-center gap-2">
+        <input type="color" className="h-8 w-10 cursor-pointer rounded-sm bg-transparent" value={value ?? '#ffffff'} onChange={(e) => onChange(e.target.value)} aria-label={label} />
+        <span className="timecode text-xs text-graphite-400">{value ?? 'del preset'}</span>
+        {value && <button className="link text-xs" onClick={() => onChange(null)}>ripristina</button>}
+      </div>
+    </Field>
   )
 }

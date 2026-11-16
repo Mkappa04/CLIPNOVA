@@ -3,6 +3,7 @@ import type {
   ClipContent, ExportItem, LlmStatus, Platform, Publication, PublishingStatus, ReviewItem, SocialAccount,
   Cue, EditConfig, EditState, Region, RenderItem, SubtitlePreset, WebcamDetection,
   BrandKit, BrandSettings, EditPlan, EditingPreset, EditingPresetId, MetadataPart, SocialMetadata,
+  AudioAsset, AudioMeta, LookName,
   AnalysisResponse, Clip, ClipCategory, ClipStatus, ScoringConfig,
   AppSettings, DashboardData, ImportResult, Job, Purpose, Rights, RightsDecision, SystemInfo, Video,
 } from '../types'
@@ -142,6 +143,18 @@ export const api = {
   makePlan: (clipId: string, config: EditConfig) =>
     request<{ job_id: string }>(`/api/clips/${clipId}/edit-plan`, { method: 'POST', body: JSON.stringify({ force: true, config }) }),
   sfxLibrary: () => request<{ category: string; available: boolean; source: string; name: string | null }[]>('/api/sfx'),
+  audioMeta: () => request<AudioMeta>('/api/audio/meta'),
+  audioLibrary: (kind?: 'music' | 'sfx') => request<AudioAsset[]>(`/api/audio${qs({ kind })}`),
+  importAudio: (file: File, form: Record<string, string | boolean>) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    for (const [k, v] of Object.entries(form)) fd.append(k, String(v))
+    return request<AudioAsset>('/api/audio', { method: 'POST', body: fd })
+  },
+  patchAudio: (id: string, body: Partial<Pick<AudioAsset, 'title' | 'enabled' | 'gain_db' | 'attribution' | 'source_url' | 'notes'>>) =>
+    request<AudioAsset>(`/api/audio/${id}`, { method: 'PATCH', body: JSON.stringify(body) }),
+  deleteAudio: (id: string) => request<{ deleted: string }>(`/api/audio/${id}${qs({ confirm: true })}`, { method: 'DELETE' }),
+  editingEffects: () => request<{ effects: { id: string; name: string; params: string[]; where: string }[]; looks: { id: LookName; label: string }[] }>('/api/editing/effects'),
   brandKit: () => request<BrandKit>('/api/brand-kit'),
   saveBrandSettings: (s: BrandSettings) => request<BrandKit>('/api/brand-kit/settings', { method: 'PUT', body: JSON.stringify(s) }),
   uploadLogo: (file: File) => {

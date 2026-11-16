@@ -1,8 +1,9 @@
-CLIPNOVA built-in sound effects (whoosh, impact, pop, riser, ding).
+CLIPNOVA built-in sound effects: whoosh, impact, bass_drop, riser, explosion, hit, transition, ui,
+cinematic, gaming, pop, ding.
 
 These files are synthesised from scratch by backend/editing/effects.py (generate_builtin):
 pure tones and seeded noise shaped by envelopes, no third-party recordings or samples.
 They are dedicated to the public domain (CC0 1.0): use them anywhere, including commercially.
 
-To use your own sounds put files you hold the rights to in data/sfx/<category>/
-(category = whoosh | impact | pop | riser | ding); they replace the built-in ones.
+Your own sounds: import them from the "Libreria audio" page (license and source required),
+or put files you hold the rights to in data/sfx/<category>/. They take precedence over the built-in ones.

@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "CLIPNOVA"
-    version: str = "1.3.0"
+    version: str = "2.0.0"
 
     host: str = "127.0.0.1"
     port: int = 8000
@@ -102,6 +102,8 @@ class Settings(BaseSettings):
 
     # Brand Kit: max logo upload size (MB) and max logo dimensions (px)
     brand_logo_max_mb: float = 5.0
+    audio_import_max_mb: float = 60.0      # audio library: max size of an imported music/SFX file
+    audio_import_max_s: float = 900.0      # max duration (15 min)
     brand_logo_max_px: int = 4096
 
     # Optional extra copy of every export package, e.g. a Windows folder:

@@ -36,10 +36,11 @@ def rules(preset: str, **kw) -> EditConfig:
 
 
 # ------------------------------------------------------------------ presets
-def test_three_presets_with_parameters():
+def test_five_presets_with_parameters():
     ps = all_presets()
-    assert list(ps)[:3] == ["gaming_dynamic", "sports_highlights", "podcast_clean"]
-    for pid in ("gaming_dynamic", "sports_highlights", "podcast_clean"):
+    five = ["gaming_dynamic", "gaming_cinematic", "sports_highlights", "podcast_clean", "storytelling"]
+    assert list(ps)[:5] == five and list(ps)[-1] == "custom"
+    for pid in five:
         p = ps[pid]
         assert p.name and len(p.description) > 40 and p.features
         EditConfig.model_validate(p.config)          # every preset value is a valid EditConfig value

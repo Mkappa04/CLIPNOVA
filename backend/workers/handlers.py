@@ -262,6 +262,16 @@ def plan_and_store(cs, clip_id: str):
     from backend.editing.renderer import get_plan
     from backend.models.entities import Clip
 
+    if cs.config.planner == "auto" and not cs.visual and not (cs.stored_plan and cs.stored_plan.get("source") == "llm"):
+        # the AI Video Director also looks at the frames (local vision model, cached per clip range)
+        try:
+            from backend.content_generation.vision import describe
+
+            with session_scope() as db:
+                c = db.get(Clip, clip_id)
+                cs.visual = describe(c) if c is not None else {}
+        except Exception as e:  # noqa: BLE001 - optional signal
+            log.info("Visual description unavailable for the Director: %s", e)
     edit = get_plan(cs, allow_llm=True)
     with session_scope() as db:
         c = db.get(Clip, clip_id)

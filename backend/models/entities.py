@@ -328,6 +328,38 @@ class BrandAsset(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class AudioAsset(Base):
+    """A music track or sound effect of the audio library, with mandatory license and provenance.
+
+    origin "builtin" = synthesised by CLIPNOVA (CC0); "user" = imported, the user declared the license."""
+
+    __tablename__ = "audio_assets"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    kind: Mapped[str] = mapped_column(String(10), index=True)            # music | sfx
+    category: Mapped[str] = mapped_column(String(20), index=True)        # mood (music) or sfx category
+    title: Mapped[str] = mapped_column(String(160), default="")
+    origin: Mapped[str] = mapped_column(String(10), default="user")      # builtin | user
+    path: Mapped[str] = mapped_column(Text)                              # absolute path on disk
+    original_name: Mapped[str] = mapped_column(String(255), default="")
+    file_size: Mapped[int] = mapped_column(Integer, default=0)
+    duration: Mapped[float] = mapped_column(Float, default=0.0)
+    bpm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    beat_offset: Mapped[float] = mapped_column(Float, default=0.0)
+    drop_time: Mapped[float | None] = mapped_column(Float, nullable=True)
+    loop_start: Mapped[float | None] = mapped_column(Float, nullable=True)
+    loop_end: Mapped[float | None] = mapped_column(Float, nullable=True)
+    loudness_db: Mapped[float | None] = mapped_column(Float, nullable=True)   # RMS dBFS of the loud part
+    energy: Mapped[float | None] = mapped_column(Float, nullable=True)
+    gain_db: Mapped[float] = mapped_column(Float, default=0.0)               # user volume trim
+    license: Mapped[str] = mapped_column(String(30))
+    attribution: Mapped[str] = mapped_column(Text, default="")
+    source_url: Mapped[str] = mapped_column(Text, default="")
+    notes: Mapped[str] = mapped_column(Text, default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class AnalysisStatus(str, Enum):
     RUNNING = "running"
     COMPLETED = "completed"

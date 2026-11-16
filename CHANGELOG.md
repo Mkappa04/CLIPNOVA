@@ -1,5 +1,79 @@
 # Changelog
 
+## 2.0.0 — AI Video Editing Engine
+
+Piano tecnico e architettura: `docs/EDITING_ENGINE_2.md`.
+
+- **AI Video Director** (`backend/editing/director.py`).
+  - **Classifica i momenti**: divertente, spettacolare, competitivo, narrativo, emozionante, informativo, tensione.
+    Il *solo movimento* viene declassato: un'azione movimentata da sola non vale un effetto.
+  - **Legge la clip**: energia, ritmo del parlato, cambi di scena, copertura del parlato, musica già presente
+    nell'audio (stima) e comprensibilità senza contesto (autonomia semantica, parlato, descrizione visiva).
+  - **Sceglie lo stile** (minimale, equilibrato, energico, cinematografico) dentro il preset: un dialogo calmo in
+    "Gaming Dynamic" riceve un montaggio minimale.
+  - **Decide** effetti di tempo, transizioni, grafiche, look, musica e suoni.
+- **Piano v2** (Pydantic).
+  - **Tracce**: accenti visivi, tempo, transizioni, testi, suoni, musica, look e la lettura del regista.
+  - **Ogni elemento** ha id, priorità e motivazione.
+  - **Il validatore ripara e annota**:
+    - timestamp fuori dalla clip;
+    - effetti incompatibili, per esempio shake o zoom sul fermo immagine, o glitch nello slow motion;
+    - effetti di tempo nelle pause tagliate o sul parlato;
+    - allungamento oltre il 30 %;
+    - transizioni fuori dai tagli;
+    - testi sovrapposti;
+    - suoni impilati;
+    - testo ASS iniettato.
+  - **L'LLM locale** sceglie solo tra opzioni consentite (effetto, effetto di tempo, mood). Non scrive mai comandi
+    FFmpeg.
+- **Audio Engine.**
+  - **Libreria audio** (tabella `audio_assets`, migrazione 0007):
+    - sei tracce originali generate proceduralmente (CC0), una per mood: cinematografica, dinamica, elettronica,
+      rilassata, drammatica, gaming;
+    - effetti sonori di serie in 12 categorie: whoosh, impact, bass drop, riser, explosion, hit, transition, UI,
+      cinematic, gaming, pop, ding;
+    - import dei tuoi file con licenza obbligatoria, conferma dei diritti, attribuzione per CC BY e fonte;
+    - analisi automatica di durata, livello, BPM, beat, drop e loop;
+    - anteprima, volume per file, attivazione e disattivazione.
+  - **Colonna sonora**:
+    - musica scelta dal regista per mood, con le tue tracce preferite;
+    - il drop o il battere della musica cade sul culmine della clip;
+    - loop su battute con crossfade, fade in e out, livello automatico;
+    - ducking sotto il parlato, guidato dalla trascrizione;
+    - SFX mai impilati, limitatore;
+    - opzione per tenere solo l'audio originale.
+- **Visual Effects Engine** (`vfx.py`).
+  - **Effetti**:
+    - camera shake con motion blur, flash, blur, zoom blur, glitch;
+    - fermo immagine con push-in;
+    - slow motion e speed ramping con frame blending, e frame reali se la sorgente ha più fps;
+    - color grading in 7 look più vignettatura;
+    - transizioni sui tagli: dissolvenza, zoom blur, flash, glitch, passaggio al nero.
+  - **Prestazioni**: tutti deterministici, ≤ 23 ms per frame a 1080×1920.
+- **Motion Graphics.**
+  - **Titolo hook animato** quando la clip ha bisogno di contesto.
+  - **Callout** con parole dette nella clip o testo leggibile a schermo, mai inventati.
+  - **Watermark testuale** dal Brand Kit.
+  - **Sottotitoli personalizzabili**: font, colori, animazione.
+- **Preset**: nuovi **Gaming Cinematic** e **Storytelling**; Gaming Dynamic, Sports Highlights e Podcast Clean
+  aggiornati con stile, effetti di tempo, look e musica.
+- **Rendering.**
+  - **Time remapping** esatto, con durate quantizzate al frame e la stessa mappatura per video e audio:
+    l'audio è montato per segmenti con `atempo`, nessuna deriva A/V.
+  - **Audio nello slow motion**: ovattato, rallentato o muto.
+  - **Robustezza**: colonna sonora in un file temporaneo rimosso a fine render; NVENC con fallback libx264.
+  - **Report del render**: musica, effetti di tempo, transizioni e grafiche nelle statistiche.
+- **Editor.**
+  - **Timeline a 6 tracce**: FX, tempo, tagli, testi, suoni, musica.
+  - **Riepilogo del regista**: stile, energia, comprensibilità, momenti classificati.
+  - **Interruttore per ogni intervento**: si possono disattivare singoli effetti, la musica o il look.
+  - **Pannello Musica**: anteprima, mood, traccia, volume, ducking.
+  - **Look e grafiche** configurabili.
+  - **Nuova pagina Libreria audio.**
+- **Test**: Director su 5 tipi di contenuto (verifica che ricevano montaggi diversi), validazione, Audio Engine
+  (tempo, sync, ducking, loop, licenze via API), VFX (pixel), timeline e un render reale con slow motion,
+  fermo immagine e musica che verifica la sincronia audio/video di un evento.
+
 ## 1.3.0 — titoli, caption e hashtag che descrivono la clip
 
 - **Analisi del contenuto prima di scrivere**: parlato con i tempi, contesto prima e dopo la clip, giudizio

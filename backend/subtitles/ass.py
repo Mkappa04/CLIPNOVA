@@ -89,7 +89,7 @@ def placement_for(style: SubtitleStyle, position: str, divider_y: int | None) ->
     return Placement(2, SAFE_BOTTOM + 60)
 
 
-def _header(style: SubtitleStyle, scale: float) -> str:
+def _header(style: SubtitleStyle, scale: float, extra_styles: list[str] = ()) -> str:
     size = int(style.size * scale)
     bold = -1 if style.bold else 0
     title_size = int(style.size * 1.4)
@@ -105,17 +105,19 @@ YCbCr Matrix: TV.709
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Sub,{style.font},{size},{ass_color(style.primary)},{ass_color(style.highlight)},{ass_color(style.outline_color)},{ass_color(style.shadow_color, 0x40)},{bold},0,0,0,100,100,1,0,1,{style.outline * scale:.1f},{style.shadow * scale:.1f},2,{SAFE_SIDE},{SAFE_SIDE},{SAFE_BOTTOM + 60},1
 Style: Title,{style.font},{title_size},{ass_color("#FFFFFF")},{ass_color(style.highlight)},{ass_color("#000000")},{ass_color("#000000", 0x60)},{bold},0,0,0,100,100,1,0,1,7,4,5,{SAFE_SIDE + 20},{SAFE_SIDE + 20},0,1
-
+{"".join(x + chr(10) for x in extra_styles)}
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
 
 def build_ass(cues: list[dict], style: SubtitleStyle, *, position: str = "auto", divider_y: int | None = None,
-              highlight: bool = True, scale: float = 1.0, titles: list[tuple[float, float, str]] = ()) -> str:
-    """cues: output-timeline cues (seconds). titles: (start, end, text) for intro/outro cards."""
+              highlight: bool = True, scale: float = 1.0, titles: list[tuple[float, float, str]] = (),
+              extra_styles: list[str] = (), extra_events: list[str] = ()) -> str:
+    """cues: output-timeline cues (seconds). titles: (start, end, text) for intro/outro cards.
+    extra_styles / extra_events: motion graphics (hook title, callouts, watermark) from motion_graphics.py."""
     place = placement_for(style, position, divider_y)
-    lines = [_header(style, scale)]
+    lines = [_header(style, scale, list(extra_styles))]
     prefix = f"{{\\an{place.alignment}"
     prefix += f"\\pos({OUT_W // 2},{place.pos_y})" if place.pos_y is not None else ""
     prefix += "}"
@@ -174,6 +176,7 @@ def build_ass(cues: list[dict], style: SubtitleStyle, *, position: str = "auto",
         if text.strip():
             lines.append(f"Dialogue: 1,{ass_time(start)},{ass_time(end)},Title,,0,0,0,,"
                          f"{{\\an5\\pos({OUT_W // 2},{OUT_H // 2})\\fad(180,180)\\q0}}{escape(text)}")
+    lines += list(extra_events)
     return "\n".join(lines) + "\n"
 
 

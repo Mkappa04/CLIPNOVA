@@ -6,6 +6,7 @@ import subprocess
 from collections.abc import Iterator
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 from backend.core.config import get_settings
@@ -81,3 +82,43 @@ def sample_frames(src: Path, duration: float, width: int, height: int, n: int = 
         except MediaError:
             continue
     return frames
+
+
+class SourceCursor:
+    """Random access *forward only* into a FrameReader stream: frame at source time t (clip-relative),
+    with linear frame blending between neighbours (slow motion). Times must not decrease."""
+
+    def __init__(self, reader: FrameReader, fps: float) -> None:
+        self.it = iter(reader)
+        self.fps = fps
+        self.idx = -1
+        self.cur: np.ndarray | None = None
+        self.nxt: np.ndarray | None = None
+        self.done = False
+
+    def _advance(self) -> None:
+        self.cur = self.nxt if self.nxt is not None else self.cur
+        try:
+            self.nxt = next(self.it).copy()
+        except StopIteration:
+            self.done = True
+            self.nxt = None
+        self.idx += 1
+
+    def at(self, t: float, blend: bool = False) -> np.ndarray | None:
+        x = max(0.0, t * self.fps)
+        i = int(x)
+        frac = x - i
+        if not blend and frac >= 0.5:
+            i, frac = i + 1, 0.0
+        if self.idx == -1:          # prime: nxt = frame 0
+            self._advance()
+            self.idx = -1
+        while self.idx < i and not self.done:
+            self._advance()
+        a = self.cur if self.cur is not None else self.nxt
+        if a is None:
+            return None
+        if blend and frac > 0.04 and self.nxt is not None and self.cur is not None:
+            return cv2.addWeighted(self.cur, 1 - frac, self.nxt, frac, 0)
+        return a

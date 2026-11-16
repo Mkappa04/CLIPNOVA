@@ -100,6 +100,12 @@ export function BrandKit() {
             <Slider label="Margine" value={s.margin} min={0} max={200} step={2} onChange={(v) => set('margin', v)} fmt={(v) => `${v}px`} />
             <Toggle label="Evita le zone dell'interfaccia social" checked={s.safe_area} onChange={(v) => set('safe_area', v)}
               hint="Tiene il logo lontano da barra in alto, didascalia in basso e pulsanti a destra" />
+            <label className="block space-y-1.5">
+              <span className="eyebrow">Watermark testuale</span>
+              <input className="input" maxLength={40} placeholder="@iltuohandle" value={s.watermark_text ?? ''}
+                onChange={(e) => set('watermark_text', e.target.value)} />
+              <span className="block text-xs text-graphite-500">Piccolo e semitrasparente in basso a destra, sopra l'area della didascalia. Vuoto = nessun watermark.</span>
+            </label>
             <button className="btn-primary" disabled={!dirty} onClick={saveSettings}><Save size={15} /> Salva impostazioni</button>
           </Section>
         </div>

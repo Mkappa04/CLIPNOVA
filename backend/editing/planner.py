@@ -28,16 +28,15 @@ from dataclasses import dataclass, field
 
 import httpx
 import numpy as np
-from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from pydantic import ValidationError
 
 from backend.clip_detection.lexicon import find_hits, normalize
 from backend.core.config import get_settings
 from backend.editing.config import EditConfig
-from backend.editing.presets import VISUAL_ZOOMS, Effect, PlannerPolicy, SfxCategory, get_preset
+from backend.editing.presets import VISUAL_ZOOMS, PlannerPolicy, get_preset
 
 log = logging.getLogger(__name__)
 
-PLAN_VERSION = 1
 REACTION_CATEGORIES = {"funny", "rage", "epic", "fail", "reaction", "clutch", "unexpected"}
 STOPWORDS = set("""
 il lo la i gli le un uno una di a da in con su per tra fra e o ma se che chi non si mi ti ci vi ne è sono era
@@ -52,126 +51,10 @@ get got go going gonna wanna can could would should will just don't i'm it's tha
 """.split())
 
 
-# ------------------------------------------------------------------ plan model
-class SfxCue(BaseModel):
-    category: SfxCategory
-    volume: float = Field(0.5, ge=0, le=1)
-    at: float = Field(0.0, ge=0, description="Clip-relative time of the sound")
-
-
-class PlanSegment(BaseModel):
-    start: float = Field(ge=0)
-    end: float = Field(gt=0)
-    effect: Effect = "none"
-    intensity: float = 0.0
-    reason: str = ""
-    sfx: SfxCue | None = None
-    candidate: int | None = None
-
-    @field_validator("intensity", mode="before")
-    @classmethod
-    def _clamp(cls, v) -> float:
-        try:
-            return float(min(1.0, max(0.0, float(v))))
-        except (TypeError, ValueError):
-            return 0.0
-
-    @field_validator("reason")
-    @classmethod
-    def _short(cls, v: str) -> str:
-        return " ".join(str(v).split())[:200]
-
-    @model_validator(mode="after")
-    def _order(self) -> PlanSegment:
-        if self.end <= self.start:
-            raise ValueError(f"segment end {self.end} <= start {self.start}")
-        if self.effect == "none":
-            self.intensity = 0.0
-            self.sfx = None
-        return self
-
-
-class EmphasisWord(BaseModel):
-    start: float = Field(ge=0)
-    end: float = Field(ge=0)
-    word: str
-    reason: str = ""
-
-
-class PauseDecision(BaseModel):
-    start: float = Field(ge=0)
-    end: float = Field(ge=0)
-    action: str = Field(pattern="^(cut|keep)$")
-    reason: str = ""
-
-
-class EditPlan(BaseModel):
-    version: int = PLAN_VERSION
-    preset: str
-    source: str = Field("rules", pattern="^(rules|llm)$")
-    duration: float = Field(gt=0)
-    segments: list[PlanSegment] = []
-    emphasis: list[EmphasisWord] = []
-    pauses: list[PauseDecision] = []
-    candidates: list[dict] = []
-    notes: list[str] = []
-    key: str = ""
-
-    @model_validator(mode="after")
-    def _normalise(self) -> EditPlan:
-        """Clamp to [0, duration], drop invalid/overlapping effect segments, fill gaps with 'none'."""
-        d = self.duration
-        effects: list[PlanSegment] = []
-        for s in sorted((s for s in self.segments if s.effect != "none"), key=lambda s: s.start):
-            a, b = max(0.0, min(s.start, d)), max(0.0, min(s.end, d))
-            if b - a < 0.15:
-                continue
-            if effects and a < effects[-1].end:  # overlap: keep the earlier one
-                continue
-            seg = s.model_copy(update={"start": round(a, 3), "end": round(b, 3)})
-            if seg.sfx is not None:
-                seg.sfx.at = round(min(max(seg.sfx.at, 0.0), d - 0.05), 3)
-            effects.append(seg)
-        nones = [s for s in self.segments if s.effect == "none" and s.reason]
-
-        def gap_reason(a: float, b: float) -> str:
-            rs: list[str] = []
-            for s in nones:
-                if a <= (s.start + s.end) / 2 <= b and s.reason not in rs:
-                    rs.append(s.reason)
-            return " | ".join(rs[:2]) if rs else "Nessun momento forte: video invariato"
-
-        out: list[PlanSegment] = []
-        cursor = 0.0
-        for s in effects:
-            if s.start - cursor >= 0.05:
-                out.append(PlanSegment(start=round(cursor, 3), end=s.start, effect="none",
-                                       reason=gap_reason(cursor, s.start)))
-            out.append(s)
-            cursor = s.end
-        if d - cursor >= 0.05 or not out:
-            end = round(d, 3) if d - cursor >= 0.05 else round(max(d, cursor + 0.05), 3)
-            out.append(PlanSegment(start=round(cursor, 3), end=end, effect="none", reason=gap_reason(cursor, d)))
-        self.segments = out
-        self.emphasis = sorted((w for w in self.emphasis if 0 <= w.start < d and w.end > w.start),
-                               key=lambda w: w.start)
-        return self
-
-    # convenience views for the renderer
-    def effect_segments(self, *kinds: str) -> list[PlanSegment]:
-        return [s for s in self.segments if s.effect in kinds]
-
-    def sfx_cues(self) -> list[SfxCue]:
-        return [s.sfx for s in self.segments if s.sfx is not None]
-
-    def kept_pauses(self) -> list[tuple[float, float]]:
-        return [(p.start, p.end) for p in self.pauses if p.action == "keep"]
-
-    def summary(self) -> dict:
-        c = Counter(s.effect for s in self.segments)
-        return {"source": self.source, "preset": self.preset, "effects": {k: v for k, v in c.items() if k != "none"},
-                "none_segments": c.get("none", 0), "emphasis": len(self.emphasis),
-                "sfx": len(self.sfx_cues()), "kept_pauses": len(self.kept_pauses())}
+# ------------------------------------------------------------------ plan model (backend/editing/plan.py)
+from backend.editing.plan import (  # noqa: E402,F401 - re-exported: older imports use planner.EditPlan etc.
+    PLAN_VERSION, SFX_CATEGORIES, EditPlan, EmphasisWord, PauseDecision, PlanSegment, SfxCue)
+from backend.editing import director  # noqa: E402
 
 
 # ------------------------------------------------------------------ inputs & candidates
@@ -191,6 +74,12 @@ class PlannerInput:
     hook: str = ""
     word_counts: dict[str, int] = field(default_factory=dict)  # whole-video token frequencies (rarity)
     total_words: int = 0
+    # 2.0 — what the Director reads besides the signals
+    visual: dict = field(default_factory=dict)      # content_generation.vision description ({} = unknown)
+    semantic: dict = field(default_factory=dict)    # semantic judgement: payoff_type, standalone (1-5), …
+    scenes: list[float] = field(default_factory=list)  # clip-relative shot changes
+    clip_id: str = ""
+    title: str = ""
 
 
 @dataclass
@@ -202,10 +91,11 @@ class Candidate:
     evidence: list[str]
     category: str = ""      # lexicon category if any (funny, rage, …)
     span: tuple[float, float] | None = None  # explicit extent (hook quote)
+    moment: str = ""        # Director's moment type (funny, spectacular, …, action_only)
 
     def as_dict(self) -> dict:
         return {"id": self.id, "t": round(self.t, 2), "kind": self.kind, "strength": round(self.strength, 2),
-                "evidence": "; ".join(self.evidence), "category": self.category}
+                "evidence": "; ".join(self.evidence), "category": self.category, "moment": self.moment}
 
 
 def _peaks(x: np.ndarray, min_value: float, min_dist: int) -> list[int]:
@@ -318,7 +208,7 @@ def _allowed(policy: PlannerPolicy, cfg: EditConfig) -> set[str]:
     if not cfg.zoom:
         allowed -= set(VISUAL_ZOOMS)
     if not cfg.effects:
-        allowed -= {"flash", "shake"}
+        allowed -= {"flash", "shake", "glitch"}
     if not (cfg.caption_emphasis and cfg.subtitles):
         allowed.discard("caption_emphasis")
     return allowed
@@ -329,7 +219,8 @@ def _choose_effect(c: Candidate, policy: PlannerPolicy, allowed: set[str]) -> st
             "action": policy.action_effect}[c.kind]
     if c.kind == "reaction" and c.strength >= 0.9 and "shake" in allowed:
         pref = "shake"
-    if c.kind == "action" and c.strength >= 0.85 and "flash" in allowed and any("lampo" in e for e in c.evidence):
+    if c.kind == "action" and c.strength >= 0.85 and "flash" in allowed and any("lampo" in e for e in c.evidence) \
+            and any("picco audio" in e for e in c.evidence):
         pref = "flash"
     if pref in allowed:
         return pref
@@ -366,21 +257,32 @@ def _sfx_for(effect: str, c: Candidate) -> str | None:
             "subtle_zoom": "whoosh"}.get(effect)
 
 
-def decide_rules(cands: list[Candidate], policy: PlannerPolicy, cfg: EditConfig, d: float) -> list[dict]:
-    """Decision per candidate: {"id", "effect", "intensity", "sfx", "reason"} (budget applied later)."""
+def decide_rules(cands: list[Candidate], policy: PlannerPolicy, cfg: EditConfig, d: float,
+                 style: str | None = None) -> list[dict]:
+    """Decision per candidate: {"id", "effect", "intensity", "sfx", "reason"} (budget applied later).
+    With a Director style the moment type picks the accent; otherwise the preset's kind mapping does."""
     allowed = _allowed(policy, cfg)
     out = []
     for c in cands:
         if c.strength < policy.min_strength:
-            out.append({"id": c.id, "effect": "none", "reason": f"Troppo debole ({c.strength:.2f}): lascio il video normale"})
+            why = ("Solo movimento sullo schermo: non lo tratto come un momento interessante"
+                   if c.moment == "action_only" else f"Troppo debole ({c.strength:.2f}): lascio il video normale")
+            out.append({"id": c.id, "effect": "none", "reason": why})
             continue
-        eff = _choose_effect(c, policy, allowed)
+        eff = director.effect_for_moment(c, policy, allowed, style) if style else None
+        if eff is None:
+            eff = _choose_effect(c, policy, allowed)
         if eff == "none":
-            out.append({"id": c.id, "effect": "none", "reason": "Nessun effetto adatto consentito dal preset"})
+            why = ("Solo movimento sullo schermo, senza reazione né evento: nessun effetto"
+                   if c.moment == "action_only" else "Nessun effetto adatto consentito dal preset")
+            out.append({"id": c.id, "effect": "none", "reason": why})
             continue
-        sfx = _sfx_for(eff, c) if c.strength >= policy.sfx_min_strength else None
+        sfx = None
+        if c.strength >= policy.sfx_min_strength:
+            sfx = director.sfx_for_moment(eff, c) if style else _sfx_for(eff, c)
+        label = f"[{c.moment}] " if c.moment else ""
         out.append({"id": c.id, "effect": eff, "intensity": 0.35 + 0.65 * c.strength, "sfx": sfx,
-                    "reason": "; ".join(c.evidence)})
+                    "reason": label + "; ".join(c.evidence)})
     return out
 
 
@@ -528,24 +430,28 @@ def decide_pauses(inp: PlannerInput, cands: list[Candidate], policy: PlannerPoli
 LLM_PROMPT = """Sei un montatore professionista di video verticali ({preset}). Clip di {dur:.0f} s{game}.
 Decidi QUANDO applicare un effetto e QUANDO NON applicarlo. Un buon montaggio usa pochi effetti, solo dove servono:
 scegli "none" per dialoghi normali, spiegazioni, momenti deboli. Non mettere effetti a caso.
+Un'azione movimentata non è per forza interessante: conta cosa succede (risata, sorpresa, giocata decisiva).
+Stile deciso dal regista: {style}.
 
 Effetti consentiti: {allowed}
 - subtle_zoom: zoom leggero, per sottolineare una frase importante
 - progressive_zoom: zoom lento che costruisce tensione verso un culmine
 - punch_zoom: zoom rapido su urla, sorprese, reazioni forti
 - caption_emphasis: solo evidenziare il sottotitolo
-- flash / shake: solo per impatti fortissimi (esplosioni, urla estreme)
+- flash / shake / glitch: solo per impatti fortissimi (esplosioni, urla estreme, errori comici)
 Massimo {max_effects} effetti in tutta la clip. Effetti sonori ({sfx_cats}): {sfx_rule}
+Effetti di tempo ({time_allowed}): {time_rule}
 
 TRASCRIZIONE (indice parola: testo, con secondi):
 {transcript}
 
-MOMENTI CANDIDATI (trovati dall'analisi audio/testo/video):
+MOMENTI CANDIDATI (trovati dall'analisi audio/testo/video, con il tipo stimato):
 {candidates}
 {pauses}
 Rispondi SOLO con JSON:
-{{"decisions": [{{"id": <id candidato>, "effect": "<effetto o none>", "intensity": <0.0-1.0>, "sfx": "<categoria o none>", "reason": "<motivo breve in italiano>"}}],
-  "emphasis_words": [<indici delle parole più importanti da evidenziare, max {max_emph}>]{pause_field}}}
+{{"decisions": [{{"id": <id candidato>, "effect": "<effetto o none>", "intensity": <0.0-1.0>, "sfx": "<categoria o none>", "time_effect": "<effetto di tempo o none>", "reason": "<motivo breve in italiano>"}}],
+  "emphasis_words": [<indici delle parole più importanti da evidenziare, max {max_emph}>],
+  "music_mood": "<uno tra {moods} oppure none>"{pause_field}}}
 Includi una decisione per OGNI candidato."""
 
 
@@ -558,8 +464,10 @@ def _llm_model() -> str | None:
 
 def decide_llm(inp: PlannerInput, cands: list[Candidate], policy: PlannerPolicy, cfg: EditConfig,
                pauses: list[PauseDecision], *, client: httpx.Client | None = None,
-               model: str | None = None) -> tuple[list[dict], list[int], list[int]]:
-    """Returns (decisions, emphasis word indices, pause indices to keep). Raises on any failure."""
+               model: str | None = None, style: str = "balanced",
+               ) -> tuple[list[dict], list[int], list[int], dict]:
+    """Returns (decisions, emphasis word indices, pause indices to keep, hints). Raises on any failure.
+    hints = {"time": {candidate id: time effect}, "music": mood | None} — options only, validated later."""
     from backend.clip_detection import semantic
 
     allowed = sorted(_allowed(policy, cfg)) + ["none"]
@@ -574,8 +482,8 @@ def decide_llm(inp: PlannerInput, cands: list[Candidate], policy: PlannerPolicy,
     if cur:
         lines.append(f"({cur_t:.1f}s) " + " ".join(cur))
     transcript = "\n".join(lines)[:5000] or "(nessun parlato)"
-    cand_txt = "\n".join(f"[{c.id}] {c.t:.1f}s {c.kind} forza={c.strength:.2f}: {'; '.join(c.evidence)}"
-                         for c in cands)
+    cand_txt = "\n".join(f"[{c.id}] {c.t:.1f}s {c.kind} tipo={c.moment or '?'} forza={c.strength:.2f}: "
+                         f"{'; '.join(c.evidence)}" for c in cands)
     max_effects = max(1, int(policy.max_effects_per_min * inp.duration / 60 + 0.5))
     sfx_on = cfg.sfx and policy.sfx_per_min > 0
     pause_txt, pause_field = "", ""
@@ -584,10 +492,17 @@ def decide_llm(inp: PlannerInput, cands: list[Candidate], policy: PlannerPolicy,
             f"<{i}> {p.start:.1f}-{p.end:.1f}s" for i, p in enumerate(pauses)) + "\n"
         pause_field = ',\n  "keep_pauses": [<indici delle pause da NON tagliare perché danno ritmo a una battuta>]'
     preset = get_preset(cfg.preset)
+    time_allowed = list(policy.allowed_time_effects) if cfg.time_effects and policy.max_time_effects else []
+    moods = list(policy.music_moods) if cfg.music == "auto" and cfg.music_mood == "auto" else []
     prompt = LLM_PROMPT.format(
-        preset=preset.name, dur=inp.duration, game=f" ({inp.game})" if inp.game else "",
+        preset=preset.name, dur=inp.duration, game=f" ({inp.game})" if inp.game else "", style=style,
         allowed=", ".join(allowed), max_effects=max_effects,
-        sfx_cats="whoosh, impact, pop, riser, ding",
+        sfx_cats=", ".join(SFX_CATEGORIES),
+        time_allowed=", ".join(time_allowed) or "nessuno",
+        time_rule=(f"al massimo {policy.max_time_effects}, solo su momenti fortissimi SENZA parlato "
+                   "(slow_motion/speed_ramp per azioni spettacolari, freeze_frame per una gag), altrimenti \"none\""
+                   if time_allowed else "disattivati: usa sempre \"none\""),
+        moods=", ".join(moods) or "none",
         sfx_rule=("al massimo uno ogni pochi secondi, solo sui momenti più forti, altrimenti \"none\"" if sfx_on
                   else "disattivati: usa sempre \"none\""),
         transcript=transcript, candidates=cand_txt, pauses=pause_txt, pause_field=pause_field,
@@ -606,6 +521,7 @@ def decide_llm(inp: PlannerInput, cands: list[Candidate], policy: PlannerPolicy,
         raise ValueError("risposta LLM senza 'decisions'")
     ids = {c.id for c in cands}
     decisions = []
+    time_hints: dict[int, str] = {}
     for d in raw["decisions"]:
         if not isinstance(d, dict):
             continue
@@ -618,39 +534,62 @@ def decide_llm(inp: PlannerInput, cands: list[Candidate], policy: PlannerPolicy,
             continue
         sfx = str(d.get("sfx", "none")).strip().lower()
         decisions.append({"id": cid, "effect": eff, "intensity": d.get("intensity", 0.6),
-                          "sfx": sfx if sfx in ("whoosh", "impact", "pop", "riser", "ding") and sfx_on else None,
+                          "sfx": sfx if sfx in SFX_CATEGORIES and sfx_on else None,
                           "reason": "AI: " + str(d.get("reason", ""))[:180]})
+        te = str(d.get("time_effect", "none")).strip().lower()
+        if te in time_allowed:
+            time_hints[cid] = te
     emph = [int(x) for x in raw.get("emphasis_words", []) if str(x).isdigit()]
     keep = [int(x) for x in raw.get("keep_pauses", []) if str(x).isdigit()]
-    return decisions, emph, keep
+    mood = str(raw.get("music_mood", "none")).strip().lower()
+    return decisions, emph, keep, {"time": time_hints, "music": mood if mood in moods else None}
 
 
 # ------------------------------------------------------------------ entry point
 def plan_key(inp: PlannerInput, cfg: EditConfig) -> str:
     p = get_preset(cfg.preset)
-    relevant = {k: getattr(cfg, k) for k in ("preset", "intensity", "planner", "zoom", "effects", "caption_emphasis",
-                                             "subtitles", "sfx", "sfx_volume", "remove_silences", "min_silence_s")}
+    relevant = {k: getattr(cfg, k) for k in (
+        "preset", "intensity", "planner", "zoom", "effects", "caption_emphasis", "subtitles", "sfx", "sfx_volume",
+        "remove_silences", "min_silence_s", "silence_strategy", "transitions", "time_effects", "motion_graphics",
+        "look", "vignette", "music", "music_mood", "music_track", "music_volume", "music_ducking", "intro")}
     h = hashlib.sha1(json.dumps({"v": PLAN_VERSION, "cfg": relevant, "policy": p.policy.model_dump(),
                                  "d": round(inp.duration, 2), "peak": inp.peak, "hook": inp.hook,
+                                 "title": inp.title, "visual": bool(inp.visual), "sem": inp.semantic,
                                  "w": [(round(w["start"], 2), w["word"]) for w in inp.words]},
                                 sort_keys=True, default=str).encode()).hexdigest()
     return h[:16]
 
 
+def _catalog() -> list[dict]:
+    try:
+        from backend.editing.audio_library import catalog
+
+        return catalog(kind="music")
+    except Exception as e:  # noqa: BLE001 - no DB / library in some contexts: no music
+        log.info("Music catalog unavailable: %s", e)
+        return []
+
+
 def make_plan(inp: PlannerInput, cfg: EditConfig, *, client: httpx.Client | None = None,
-              model: str | None = None) -> EditPlan:
+              model: str | None = None, catalog: list[dict] | None = None) -> EditPlan:
     preset = get_preset(cfg.preset)
-    policy = preset.policy
     d = max(0.2, inp.duration)
     cands = find_candidates(inp)
+    # 1. the Director reads the clip: moment types (movement-only demoted), energy, style, comprehensibility
+    summary = director.analyse(inp, cands, preset.policy)
+    policy = director.scaled_policy(preset.policy, summary.style)
     pauses = decide_pauses(inp, cands, policy, cfg)
-    notes: list[str] = []
+    notes: list[str] = list(summary.notes)
     source = "rules"
     emph_forced: list[int] | None = None
-    decisions = decide_rules(cands, policy, cfg, d)
-    if cfg.planner == "auto" and cands and _allowed(policy, cfg):
+    hints: dict | None = None
+    # 2. accents: rules, optionally refined by the local LLM (which can only choose among the candidates)
+    decisions = decide_rules(cands, policy, cfg, d, summary.style)
+    wants_llm = _allowed(policy, cfg) or (cfg.time_effects and policy.max_time_effects)
+    if cfg.planner == "auto" and cands and wants_llm:
         try:
-            llm_dec, emph_forced, keep = decide_llm(inp, cands, policy, cfg, pauses, client=client, model=model)
+            llm_dec, emph_forced, keep, hints = decide_llm(inp, cands, policy, cfg, pauses, client=client,
+                                                           model=model, style=summary.style)
             if llm_dec:
                 decided = {x["id"] for x in llm_dec}
                 # candidates the LLM skipped: explicit none (it was asked to answer for all)
@@ -660,22 +599,47 @@ def make_plan(inp: PlannerInput, cfg: EditConfig, *, client: httpx.Client | None
                 if keep:
                     pauses = decide_pauses(inp, cands, policy, cfg, forced_keep=keep)
             else:
+                hints = None
                 notes.append("L'AI planner non ha restituito decisioni valide: uso le regole")
         except (httpx.HTTPError, ValueError, KeyError, RuntimeError, TypeError) as e:
             log.info("LLM planner unavailable (%s): rules plan", e)
             notes.append(f"AI planner locale non disponibile ({str(e)[:80]}): piano a regole")
     segments, limit_notes, why = enforce(decisions, cands, policy, cfg, d)
     notes += limit_notes
+    # 3. beyond accents: time, transitions, graphics, look, music, sounds
+    time_fx, tnotes = director.plan_time_effects(inp, cands, policy, cfg, pauses,
+                                                 hints.get("time") if hints else None)
+    notes += tnotes
+    frozen = {e.candidate for e in time_fx if e.kind == "freeze_frame"}
+    if frozen:
+        replaced = [s for s in segments if s.candidate in frozen]
+        segments = [s for s in segments if s.candidate not in frozen]
+        for s in replaced:
+            why[s.candidate] = "sostituito dal fermo immagine"
+    transitions = director.plan_transitions(inp, cands, policy, cfg, pauses, summary.style, sfx_on=cfg.sfx)
+    overlays = director.plan_overlays(inp, cands, policy, cfg, summary,
+                                      [e.start for e in time_fx if e.kind == "freeze_frame"])
+    look = director.plan_look(cfg, preset.policy, summary)
+    if catalog is None and cfg.music != "off":
+        catalog = _catalog()
+    music, mnotes = director.plan_music(inp, cands, preset.policy, cfg, summary, catalog, time_fx,
+                                        hints.get("music") if hints else None)
+    notes += mnotes
+    used = [s.sfx.at for s in segments if s.sfx] + [t.at for t in transitions if t.sfx]
+    sounds = director.plan_sounds(cands, policy, cfg, summary, time_fx, music, used)
     none_reasons = [PlanSegment(start=max(0.0, min(c.t, d - 0.2)), end=min(d, max(c.t, 0.0) + 0.2), effect="none",
                                 reason=f"{c.evidence[0]} → none: {why.get(c.id, 'nessun effetto necessario')}")
                     for c in cands if c.id not in {s.candidate for s in segments}]
     emphasis = choose_emphasis(inp, cands, policy, cfg, forced=emph_forced)
     if not cands:
         notes.append("Nessun momento forte trovato: nessun effetto (scelta voluta)")
+    summary.moments = [m.model_copy(update={"strength": round(next((c.strength for c in cands if c.id == m.candidate),
+                                                                     m.strength), 2)}) for m in summary.moments]
     try:
         return EditPlan(preset=preset.id, source=source, duration=d, segments=segments + none_reasons,
-                        emphasis=emphasis, pauses=pauses, candidates=[c.as_dict() for c in cands],
-                        notes=notes[:20], key=plan_key(inp, cfg))
+                        emphasis=emphasis, pauses=pauses, time_effects=time_fx, transitions=transitions,
+                        overlays=overlays, sounds=sounds, music=music, look=look, director=summary,
+                        candidates=[c.as_dict() for c in cands], notes=notes[:20], key=plan_key(inp, cfg))
     except ValidationError as e:  # should never happen: fall back to a plan with no effects at all
         log.error("Invalid plan, using an empty one: %s", e)
         return EditPlan(preset=preset.id, duration=d, notes=["Piano non valido: nessun effetto"],

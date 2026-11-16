@@ -1,6 +1,6 @@
 import {
   BarChart3, Captions, CheckCircle2, Clapperboard, Compass, Film, FolderSync, Gauge, Layers, Rocket, ScanSearch,
-  Settings, Stamp, Users, type LucideIcon,
+  Music2, Settings, Stamp, Users, type LucideIcon,
 } from 'lucide-react'
 
 export interface NavItem { to: string; label: string; icon: LucideIcon; hint: string }
@@ -32,7 +32,8 @@ export const STAGES: NavStage[] = [
   },
   {
     id: 'system', index: '04', label: 'Sistema', icon: Settings, items: [
-      { to: '/brand-kit', label: 'Brand Kit', icon: Stamp, hint: 'Il tuo logo' },
+      { to: '/brand-kit', label: 'Brand Kit', icon: Stamp, hint: 'Logo e watermark' },
+      { to: '/audio', label: 'Libreria audio', icon: Music2, hint: 'Musiche ed effetti sonori' },
       { to: '/analytics', label: 'Analytics', icon: BarChart3, hint: 'Produzione e qualità' },
       { to: '/settings', label: 'Impostazioni', icon: Settings, hint: 'Ambiente e manutenzione' },
     ],

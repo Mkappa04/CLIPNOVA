@@ -116,8 +116,9 @@ def test_brand_kit_upload_validation_and_settings(client):
 def test_presets_and_plan_api(client, game_clip):
     vid, cid = game_clip
     presets = client.get("/api/editing/presets").json()
-    assert [p["id"] for p in presets][:3] == ["gaming_dynamic", "sports_highlights", "podcast_clean"]
-    for pid in ("gaming_dynamic", "sports_highlights", "podcast_clean"):
+    five = ["gaming_dynamic", "gaming_cinematic", "sports_highlights", "podcast_clean", "storytelling"]
+    assert [p["id"] for p in presets][:5] == five
+    for pid in five:
         cfg = client.put(f"/api/clips/{cid}/preset", json={"preset": pid}).json()["config"]
         assert cfg["preset"] == pid
         plan = client.get(f"/api/clips/{cid}/edit-plan").json()["plan"]
@@ -140,7 +141,8 @@ def test_presets_and_plan_api(client, game_clip):
         r = client.get(f"/api/clips/{c['id']}/edit-plan")
         assert r.status_code == 200 and r.json()["plan"]["segments"]
     assert client.get("/api/clips/does-not-exist/edit-plan").status_code == 404
-    assert [x["category"] for x in client.get("/api/sfx").json()] == ["whoosh", "impact", "pop", "riser", "ding"]
+    from backend.editing.effects import CATEGORIES
+    assert [x["category"] for x in client.get("/api/sfx").json()] == list(CATEGORIES)
 
 
 # ------------------------------------------------------------------ preview: logo opacity/position, subtitles
@@ -196,7 +198,12 @@ def test_render_gaming_dynamic_with_logo_and_sfx(client, game_clip):
     assert v["r_frame_rate"] == "30/1" and stats["fps"] == 30                   # "auto" = source 30 fps
     assert a["codec_name"] == "aac"
     dur = float(info["format"]["duration"])
-    assert dur == pytest.approx(r["duration"], abs=0.1) and dur == pytest.approx(14.0 - stats["cut_seconds"], abs=0.3)
+    assert dur == pytest.approx(r["duration"], abs=0.1) and dur == pytest.approx(stats["expected_duration"], abs=0.1)
+    added = sum((t["out_end"] - t["out_start"]) for t in stats["time_effects"])
+    if not stats["time_effects"]:
+        assert dur == pytest.approx(14.0 - stats["cut_seconds"], abs=0.3)
+    else:   # slow motion / speed ramp lengthen the clip, bounded by the plan validator (≤ 30 %)
+        assert 14.0 - stats["cut_seconds"] < dur <= (14.0 - stats["cut_seconds"]) * 1.3 + 0.2 and added > 0
     assert stats["preset"] == "gaming_dynamic" and stats["plan"]["effects"]
     assert stats["sfx"] and stats["tracking"] in ("action", "center")
     assert stats["logo"] == {"corner": "top-left", "x": 76, "y": 230, "w": 216, "h": 96, "opacity": 1.0}

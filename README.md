@@ -300,6 +300,40 @@ indicato; il modello da 8B può fare piccoli errori di grammatica; un nome inven
 controllo automatico (resta la revisione); ~45–60 s per clip con `qwen3:8b` + `qwen3.5:4b`.
 Valutazione: `.venv/bin/python scripts/eval_metadata.py` (8 scenari, modello reale).
 
+### AI Video Editing Engine (2.0)
+Il **Clip Editor** non si limita più a zoom e sottotitoli. Un *regista* (AI Video Director) legge la clip e
+decide il montaggio dentro lo stile del preset.
+
+- **Lettura della clip.** Classifica i momenti: divertente, spettacolare, competitivo, narrativo, emozionante,
+  informativo, tensione. Il solo movimento non conta come momento. Valuta energia, ritmo, quanto si parla e se la
+  clip si capisce senza contesto.
+- **Stile.** Sceglie quanto intervenire: minimale, equilibrato, energico o cinematografico.
+- **Interventi.** Zoom, shake, flash, glitch; slow motion, speed ramp e fermo immagine, mai sul parlato;
+  transizioni sui tagli; titolo hook e scritte con parole davvero dette; color grading e vignettatura; musica ed
+  effetti sonori.
+
+Ogni intervento ha un motivo, si vede nella timeline a tracce e si può disattivare singolarmente.
+
+**Preset.** Gaming Dynamic, Gaming Cinematic, Sports Highlights, Podcast Clean, Storytelling.
+
+**Audio.**
+- **Libreria audio** (`/audio`): 6 tracce originali di serie (CC0) e 12 categorie di effetti sonori. Puoi
+  importare i tuoi file solo dichiarando licenza e fonte.
+- **Colonna sonora**: il drop o il battere della musica cade sul culmine, la musica si abbassa da sola quando
+  qualcuno parla, livelli e fade sono automatici, c'è un limitatore finale.
+
+**Sicurezza.** L'AI produce solo un piano JSON validato. Il backend lo traduce in operazioni predefinite
+(OpenCV/numpy e filtri FFmpeg costruiti dal codice).
+
+**Limiti dichiarati.**
+- La musica di serie è procedurale: funzionale, non da produzione. Importa tracce con licenza e il regista le
+  preferirà.
+- Lo slow motion usa il frame blending (frame reali solo se la sorgente ha più fps dell'uscita). Non c'è
+  interpolazione ottica.
+- BPM e drop delle tracce importate sono stime.
+
+Dettagli: `docs/EDITING_ENGINE_2.md`.
+
 ### Note tecniche: crash CUDA della trascrizione
 Su questo PC (RTX 3060 Laptop, driver Windows 610.74, WSL 2) CTranslate2 va in errore CUDA
 (`cudaErrorIllegalAddress` / `IllegalInstruction`) dopo decine di secondi di inferenza continua su audio reale,

@@ -46,6 +46,7 @@ class BrandSettings(BaseModel):
     opacity: float = Field(0.85, ge=0.1, le=1.0)
     margin: int = Field(40, ge=0, le=200, description="Distance from the edges (px on 1080x1920)")
     safe_area: bool = Field(True, description="Keep the logo out of the platforms' UI zones")
+    watermark_text: str = Field("", max_length=40, description="Text watermark, e.g. @yourhandle ('' = none)")
 
 
 def load_settings(db: Session) -> BrandSettings:

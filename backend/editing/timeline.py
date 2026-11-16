@@ -6,6 +6,7 @@ quantised to the output frame grid so audio and video cut on the same instant.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -16,10 +17,22 @@ class Segment:
     start: float  # clip-relative source time
     end: float
     out_start: float  # position in the output (excluding intro)
+    speed: float = 1.0   # playback speed (< 1 = slow motion); out duration = (end - start) / speed
+    hold: float = 0.0    # freeze frame: start == end, the frame at `start` is held for `hold` seconds
+    kind: str = ""       # "" | slow_motion | speed_ramp | freeze_frame
 
     @property
     def duration(self) -> float:
+        """Source duration."""
         return self.end - self.start
+
+    @property
+    def out_duration(self) -> float:
+        return self.hold if self.hold > 0 else (self.end - self.start) / self.speed
+
+    @property
+    def out_end(self) -> float:
+        return self.out_start + self.out_duration
 
 
 def _q(t: float, fps: int) -> float:
@@ -89,29 +102,135 @@ def compute_segments(
 
 
 def output_duration(segments: list[Segment]) -> float:
-    return sum(s.duration for s in segments)
+    return sum(s.out_duration for s in segments)
 
 
-def map_time(t: float, segments: list[Segment]) -> float | None:
-    """Clip-relative source time → output time (None if the instant was cut)."""
+def map_time(t: float, segments: list[Segment], last: bool = False) -> float | None:
+    """Clip-relative source time → output time (None if the instant was cut). At a freeze frame the
+    instant exists twice (before and after the hold): first occurrence by default, `last` for the other."""
+    hit = None
     for s in segments:
+        if s.hold > 0:
+            if abs(t - s.start) <= 1e-6:
+                hit = s.out_start if hit is None else hit
+                if last:
+                    hit = s.out_end
+            continue
         if s.start - 1e-6 <= t <= s.end + 1e-6:
-            return s.out_start + (t - s.start)
-    return None
+            v = s.out_start + (t - s.start) / s.speed
+            if not last:
+                return v if hit is None else hit
+            hit = v
+    return hit
+
+
+def _runs(segments: list[Segment]) -> list[list[Segment]]:
+    """Groups of segments contiguous in the source (speed changes and freezes do not break a run)."""
+    runs: list[list[Segment]] = []
+    for s in segments:
+        if runs and abs(s.start - runs[-1][-1].end) < 1e-6:
+            runs[-1].append(s)
+        else:
+            runs.append([s])
+    return runs
 
 
 def map_interval(a: float, b: float, segments: list[Segment]) -> tuple[float, float] | None:
-    """Map a source interval to the output, clamping it to the kept part that contains most of it."""
+    """Map a source interval to the output, clamping it to the kept run that contains most of it."""
     best: tuple[float, float] | None = None
     best_len = 0.0
-    for s in segments:
-        lo, hi = max(a, s.start), min(b, s.end)
+    for run in _runs(segments):
+        lo, hi = max(a, run[0].start), min(b, run[-1].end)
         if hi - lo > best_len:
-            best_len = hi - lo
-            best = (s.out_start + lo - s.start, s.out_start + hi - s.start)
+            o0, o1 = map_time(lo, run), map_time(hi, run, last=True)
+            if o0 is not None and o1 is not None:
+                best_len = hi - lo
+                best = (o0, o1)
     return best
 
 
+def inverse(t_out: float, segments: list[Segment]) -> tuple[float, Segment]:
+    """Output time (body, no intro) → (clip-relative source time, segment). Monotonic in t_out."""
+    for s in segments:
+        if t_out < s.out_end - 1e-9:
+            if s.hold > 0:
+                return s.start, s
+            return s.start + max(0.0, t_out - s.out_start) * s.speed, s
+    s = segments[-1]
+    return s.end, s
+
+
 def cut_points(segments: list[Segment]) -> list[float]:
-    """Output times where a jump cut happens (for transitions)."""
-    return [s.out_start for s in segments[1:]]
+    """Output times where a jump cut happens (the source jumps forward)."""
+    return [b.out_start for a, b in zip(segments, segments[1:]) if b.start - a.end > 1e-6]
+
+
+def cuts_with_source(segments: list[Segment]) -> list[tuple[float, float, float]]:
+    """(output time, source time before the cut, source time after it) for every jump cut."""
+    return [(b.out_start, a.end, b.start) for a, b in zip(segments, segments[1:]) if b.start - a.end > 1e-6]
+
+
+def _ease(x: float) -> float:
+    return 0.5 - 0.5 * math.cos(math.pi * x)
+
+
+def apply_time_effects(segments: list[Segment], effects: list, fps: int, ramp_steps: int = 8) -> list[Segment]:
+    """Split the kept segments at the time effects and give each piece its speed; insert freeze holds.
+
+    Output durations are quantised to whole frames and the speed is re-derived from them, so the video
+    (inverse) and the audio (atempo per piece) use exactly the same mapping: no A/V drift."""
+    pieces: list[tuple[float, float, float, float, str]] = []   # (start, end, speed, hold, kind)
+    for seg in segments:
+        cuts = [(seg.start, seg.end, 1.0, 0.0, "")]
+        for e in effects:
+            kind = e.kind
+            nxt = []
+            for a, b, sp, hold, k in cuts:
+                if hold > 0 or k:
+                    nxt.append((a, b, sp, hold, k))
+                    continue
+                if kind == "freeze_frame":
+                    t = e.start
+                    if a < t < b:
+                        nxt += [(a, t, sp, 0.0, ""), (t, t, 1.0, e.hold, "freeze_frame"), (t, b, sp, 0.0, "")]
+                    else:
+                        nxt.append((a, b, sp, hold, k))
+                    continue
+                lo, hi = max(a, e.start), min(b, e.end)
+                if hi - lo < 0.05:
+                    nxt.append((a, b, sp, hold, k))
+                    continue
+                if lo > a:
+                    nxt.append((a, lo, 1.0, 0.0, ""))
+                if kind == "slow_motion":
+                    nxt.append((lo, hi, e.speed, 0.0, kind))
+                else:  # speed ramp: 1 → speed → 1 with an eased curve, in steps
+                    span = e.end - e.start
+                    for i in range(ramp_steps):
+                        x0 = e.start + span * i / ramp_steps
+                        x1 = e.start + span * (i + 1) / ramp_steps
+                        p0, p1 = max(lo, x0), min(hi, x1)
+                        if p1 - p0 < 1e-3:
+                            continue
+                        mid = (i + 0.5) / ramp_steps
+                        depth = math.sin(math.pi * mid) ** 1.5
+                        nxt.append((p0, p1, 1.0 - (1.0 - e.speed) * depth, 0.0, kind))
+                if hi < b:
+                    nxt.append((hi, b, 1.0, 0.0, ""))
+            cuts = nxt
+        pieces += cuts
+    out: list[Segment] = []
+    o = 0.0
+    for a, b, sp, hold, k in pieces:
+        if hold > 0:
+            dur = max(1, round(hold * fps)) / fps
+            out.append(Segment(a, a, round(o, 6), 1.0, dur, k))
+            o += dur
+            continue
+        if b - a < 1e-4:
+            continue
+        frames = max(1, round((b - a) / sp * fps))
+        dur = frames / fps
+        out.append(Segment(a, b, round(o, 6), (b - a) / dur, 0.0, k))
+        o += dur
+    return out

@@ -251,7 +251,9 @@ export interface Region {
   confidence?: number
 }
 
-export type EditingPresetId = 'custom' | 'gaming_dynamic' | 'sports_highlights' | 'podcast_clean'
+export type EditingPresetId = 'custom' | 'gaming_dynamic' | 'gaming_cinematic' | 'sports_highlights' | 'podcast_clean' | 'storytelling'
+export type LookName = 'none' | 'teal_orange' | 'warm' | 'cool' | 'punchy' | 'bw' | 'cinematic' | 'vivid'
+export type MusicMood = 'cinematic' | 'dynamic' | 'electronic' | 'chill' | 'dramatic' | 'gaming'
 export type FpsChoice = 'auto' | 24 | 25 | 30 | 50 | 60
 
 export interface EditConfig {
@@ -275,6 +277,18 @@ export interface EditConfig {
   sfx: boolean
   sfx_volume: number
   logo: boolean
+  time_effects: boolean
+  motion_graphics: boolean
+  watermark: boolean
+  look: 'auto' | LookName
+  vignette: boolean
+  music: 'auto' | 'off'
+  music_mood: 'auto' | MusicMood
+  music_track: string | null
+  music_volume: number
+  music_ducking: number
+  slowmo_audio: 'muffle' | 'tempo' | 'mute'
+  disabled_items: string[]
   remove_silences: boolean
   silence_strategy: 'quiet' | 'no_speech'
   min_silence_s: number
@@ -287,6 +301,10 @@ export interface EditConfig {
   subtitle_position: 'auto' | 'top' | 'middle' | 'bottom'
   subtitle_scale: number
   highlight_words: boolean
+  subtitle_font: 'preset' | 'Anton' | 'Luckiest Guy' | 'Lato'
+  subtitle_color: string | null
+  subtitle_highlight_color: string | null
+  subtitle_animation: 'preset' | 'none' | 'pop' | 'bounce'
   intro: boolean
   intro_text: string
   intro_duration: number
@@ -297,7 +315,7 @@ export interface EditConfig {
   quality: 'draft' | 'standard' | 'high'
 }
 
-export type PlanEffect = 'none' | 'subtle_zoom' | 'progressive_zoom' | 'punch_zoom' | 'caption_emphasis' | 'flash' | 'shake'
+export type PlanEffect = 'none' | 'subtle_zoom' | 'progressive_zoom' | 'punch_zoom' | 'caption_emphasis' | 'flash' | 'shake' | 'glitch'
 
 export interface EditingPreset {
   id: EditingPresetId
@@ -305,10 +323,17 @@ export interface EditingPreset {
   description: string
   features: string[]
   config: Partial<EditConfig>
-  policy: { allowed_effects: PlanEffect[]; max_effects_per_min: number; min_gap_s: number; sfx_per_min: number }
+  policy: { allowed_effects: PlanEffect[]; max_effects_per_min: number; min_gap_s: number; sfx_per_min: number;
+    style: PlanStyle; allowed_time_effects: TimeKind[]; music_moods: MusicMood[]; look: LookName }
 }
 
+export type PlanStyle = 'minimal' | 'balanced' | 'energetic' | 'cinematic'
+export type TimeKind = 'slow_motion' | 'speed_ramp' | 'freeze_frame'
+export type MomentType = 'funny' | 'spectacular' | 'competitive' | 'narrative' | 'emotional' | 'informative' | 'tension' | 'action_only'
+
 export interface PlanSegment {
+  id: string
+  priority: number
   start: number
   end: number
   effect: PlanEffect
@@ -324,9 +349,53 @@ export interface EditPlan {
   segments: PlanSegment[]
   emphasis: { start: number; end: number; word: string; reason: string }[]
   pauses: { start: number; end: number; action: 'cut' | 'keep'; reason: string }[]
-  candidates: { id: number; t: number; kind: string; strength: number; evidence: string }[]
+  candidates: { id: number; t: number; kind: string; strength: number; evidence: string; moment?: MomentType }[]
+  time_effects: { id: string; kind: TimeKind; start: number; end: number; speed: number; hold: number; priority: number; reason: string }[]
+  transitions: { id: string; kind: 'crossfade' | 'zoom_blur' | 'flash' | 'glitch' | 'dip'; at: number; duration: number; sfx: { category: string } | null; reason: string }[]
+  overlays: { id: string; kind: 'hook_title' | 'callout'; start: number; end: number; text: string; animation: string; evidence: string; reason: string }[]
+  sounds: { id: string; category: string; at: number; volume: number; reason: string }[]
+  music: { id: string; asset_id: string; title: string; mood: MusicMood; bpm: number | null; license: string; attribution: string; level_db: number; duck_db: number; sync_at: number | null; reason: string } | null
+  look: { grade: LookName; intensity: number; vignette: number; reason: string }
+  director: { style: PlanStyle; energy: number; comprehensibility: number; dominant: MomentType | null; speech_coverage: number;
+    words_per_s: number; scene_cuts: number; original_music: boolean; content_kind: string; notes: string[];
+    moments: { candidate: number; t: number; type: MomentType; strength: number; evidence: string }[] } | null
+  issues: string[]
   notes: string[]
   key: string
+}
+
+export interface AudioAsset {
+  id: string
+  kind: 'music' | 'sfx'
+  category: string
+  title: string
+  origin: 'builtin' | 'user'
+  original_name: string
+  file_size: number
+  duration: number
+  bpm: number | null
+  drop_time: number | null
+  loudness_db: number | null
+  energy: number | null
+  gain_db: number
+  license: string
+  license_label: string
+  attribution: string
+  source_url: string
+  notes: string
+  enabled: boolean
+  available: boolean
+  url: string
+  created_at: string | null
+}
+
+export interface AudioMeta {
+  moods: { id: MusicMood; label: string }[]
+  sfx_categories: { id: string; label: string; description: string }[]
+  licenses: { id: string; label: string }[]
+  formats: string[]
+  max_mb: number
+  max_s: number
 }
 
 export interface BrandSettings {
@@ -336,6 +405,7 @@ export interface BrandSettings {
   opacity: number
   margin: number
   safe_area: boolean
+  watermark_text: string
 }
 
 export interface BrandKit {
@@ -387,6 +457,10 @@ export interface RenderItem {
     plan?: { source: string; effects: Record<string, number>; emphasis: number; sfx: number; kept_pauses: number }
     sfx?: { t: number; category: string; volume: number }[]
     logo?: { corner: string } | null
+    time_effects?: { kind: string; out_start: number; out_end: number; speed: number }[]
+    music?: { title: string; mood: string; license: string; attribution: string } | null
+    transitions?: { t: number; kind: string }[]
+    graphics?: { kind: string; text: string }[]
   }
   error: string | null
   created_at: string

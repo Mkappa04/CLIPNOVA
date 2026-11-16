@@ -20,12 +20,20 @@ Facoltativo: `scripts/install-service.sh` avvia CLIPNOVA automaticamente con WSL
    - Imposta sempre i **diritti** (proprietario, licenza, autorizzazione): senza, l'export resta bloccato.
 2. **Clip Detection**: *Analizza video* → timeline dell'interesse, clip con categoria, score e motivazione.
    Puoi cambiare i pesi e ricalcolare all'istante, correggere i tempi, aggiungere clip a mano.
-3. **Clip Editor**: scegli il **preset** (Gaming Dynamic, Sports Highlights, Podcast Clean), guarda il **piano
-   dell'AI Editing Planner** (dove zooma, quali parole evidenzia, dove mette un suono, dove *non* fa nulla e perché;
-   *Genera con AI locale* per farlo ragionare con Ollama), poi regola quello che vuoi: layout, webcam, inquadratura
-   (segue l'azione o lo speaker), sottotitoli (Dynamic/Clean Captions), effetti sonori, logo, audio, intro/outro.
-   *Anteprima* = video completo in bozza da guardare subito; *Render* = qualità finale; *Rigenera* su ogni render.
-   Il logo si carica una volta sola in **Brand Kit**.
+3. **Clip Editor**
+   - **Preset**: scegline uno tra Gaming Dynamic, Gaming Cinematic, Sports Highlights, Podcast Clean e
+     Storytelling.
+   - **Piano AI**: il regista spiega cosa ha capito (stile, energia, se la clip si capisce da sola, tipo di ogni
+     momento) e cosa farà: zoom, slow motion o speed ramp, transizioni, titoli e scritte, suoni, musica, look. Per
+     ogni intervento c'è il motivo; togli la spunta per escluderlo. *Rigenera con AI locale* lo fa ragionare con
+     Ollama, guardando anche i fotogrammi.
+   - **Audio**: musica scelta dal regista oppure solo l'audio originale, con mood, traccia, volume e quanto
+     abbassarla sotto il parlato.
+   - **Altre regolazioni**: layout, webcam, inquadratura, sottotitoli (font, colori, animazione), logo, watermark,
+     intro e outro.
+   - **Render**: *Anteprima* produce il video completo in bozza; *Render* la qualità finale.
+   - Il logo e il watermark testuale si impostano una volta in **Brand Kit**. Le musiche e gli effetti sonori tuoi,
+     sempre con licenza, si importano in **Libreria audio**.
 4. **Subtitle Editor**: correggi il testo dei sottotitoli; poi rifai il render.
 5. **Approval Center**: guarda il video finale; *Genera* (circa 1 minuto): l'AI guarda la clip e propone 3 titoli,
    caption per Instagram e TikTok, titolo e descrizione YouTube e hashtag per ogni piattaforma. Apri "Cosa ha capito
