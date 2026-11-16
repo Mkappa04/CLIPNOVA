@@ -1,14 +1,23 @@
-import { AlertTriangle, CheckCircle2, Clock, Film, HardDrive, Layers, ScanSearch, Upload } from 'lucide-react'
+import { AlertTriangle, BarChart3, CheckCircle2, Clock, Film, HardDrive, Layers, Scissors, ScanSearch, ShieldCheck, Upload } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { ImportModal } from '../components/ImportModal'
 import { JobList } from '../components/JobList'
+import { BentoGrid, BentoGridItem } from '@/components/ui/bento-grid'
 import { ErrorBox, PageHeader, ProgressBar, Spinner } from '../components/ui'
 import { VideoCard } from '../components/VideoCard'
 import { VideoDetail } from '../components/VideoDetail'
 import { useApi } from '../hooks/useApi'
 import { api } from '../services/api'
 import { formatBytes, formatDuration } from '../services/format'
+
+const QUICK_LINKS = [
+  { to: '/library', title: 'Libreria video', description: 'Sfoglia, importa e gestisci il girato sorgente.', icon: Film, span: 'md:col-span-2', glow: 'from-nova-600/40 via-nova-500/10' },
+  { to: '/detection', title: 'Clip Detection', description: 'Trova automaticamente i momenti migliori.', icon: ScanSearch, span: '', glow: 'from-pulse-500/40 via-pulse-500/10' },
+  { to: '/editor', title: 'Clip Editor', description: 'Taglia, reframe e sottotitoli.', icon: Scissors, span: '', glow: 'from-pulse-500/30 via-nova-500/10' },
+  { to: '/approval', title: 'Approval Center', description: 'Rivedi e approva le clip prima della pubblicazione.', icon: ShieldCheck, span: '', glow: 'from-emerald-500/30 via-emerald-500/5' },
+  { to: '/analytics', title: 'Analytics', description: 'Performance dei contenuti pubblicati.', icon: BarChart3, span: '', glow: 'from-nova-500/40 via-pulse-500/10' },
+]
 
 const PIPELINE = ['Import', 'Analysis', 'Detection', 'Editing', 'Rendering', 'Review', 'Approved', 'Export']
 
@@ -38,6 +47,20 @@ export function Dashboard() {
     <>
       <PageHeader title="Dashboard" subtitle="Panoramica della pipeline CLIPNOVA"
         actions={<button className="btn-primary" onClick={() => setImportOpen(true)}><Upload size={16} /> Importa video</button>} />
+
+      <BentoGrid className="mb-6 max-w-none md:auto-rows-[11rem]">
+        {QUICK_LINKS.map(({ to, title, description, icon: Icon, span, glow }) => (
+          <Link key={to} to={to} className={span}>
+            <BentoGridItem
+              className="h-full border-ink-700/80 bg-ink-900/80 hover:border-nova-500/50 dark:border-ink-700/80 dark:bg-ink-900/80"
+              header={<div className={`min-h-[3rem] flex-1 rounded-lg bg-gradient-to-br ${glow} to-transparent ring-1 ring-ink-700/60`} />}
+              icon={<Icon size={16} className="text-nova-400" />}
+              title={title}
+              description={description}
+            />
+          </Link>
+        ))}
+      </BentoGrid>
 
       {error && <ErrorBox error={error} onRetry={reload} />}
       {loading && !data && <Spinner />}
