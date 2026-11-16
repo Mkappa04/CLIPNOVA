@@ -2,7 +2,7 @@ import type {
   AutomationSettingsT, AutomationStatus, CreatorT, DiscoveryResult, DiscoveryStatus, NotificationT, WatchFolderT, WatchedFileT,
   ClipContent, ExportItem, LlmStatus, Platform, Publication, PublishingStatus, ReviewItem, SocialAccount,
   Cue, EditConfig, EditState, Region, RenderItem, SubtitlePreset, WebcamDetection,
-  BrandKit, BrandSettings, EditPlan, EditingPreset, EditingPresetId,
+  BrandKit, BrandSettings, EditPlan, EditingPreset, EditingPresetId, MetadataPart, SocialMetadata,
   AnalysisResponse, Clip, ClipCategory, ClipStatus, ScoringConfig,
   AppSettings, DashboardData, ImportResult, Job, Purpose, Rights, RightsDecision, SystemInfo, Video,
 } from '../types'
@@ -155,8 +155,9 @@ export const api = {
   approvalQueue: (status: string) => request<ReviewItem[]>(`/api/approval/queue${qs({ status })}`),
   approvalCounts: () => request<Record<string, number>>('/api/approval/counts'),
   review: (clipId: string) => request<ReviewItem>(`/api/clips/${clipId}/review`),
-  generateContent: (clipId: string, useLlm: boolean, language?: string) =>
-    request<{ content: ClipContent; warnings: string[] }>(`/api/clips/${clipId}/content/generate`, { method: 'POST', body: JSON.stringify({ use_llm: useLlm, language }) }),
+  generateContent: (clipId: string, useLlm: boolean, language?: string, parts?: MetadataPart[], current?: SocialMetadata | null) =>
+    request<{ content: ClipContent; warnings: string[] }>(`/api/clips/${clipId}/content/generate`, {
+      method: 'POST', body: JSON.stringify({ use_llm: useLlm, language, parts: parts ?? null, current: current ?? null }) }),
   saveContent: (clipId: string, content: ClipContent) =>
     request<ReviewItem>(`/api/clips/${clipId}/content`, { method: 'PUT', body: JSON.stringify(content) }),
   reviewAction: (clipId: string, action: 'approve' | 'reject' | 'archive' | 'reopen', note = '') =>

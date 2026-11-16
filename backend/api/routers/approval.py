@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query
@@ -59,16 +61,21 @@ def get_review(clip_id: str, db: Session = Depends(get_db)) -> dict:
 
 
 class GenerateRequest(BaseModel):
-    use_llm: bool = False
+    use_llm: bool = True
     language: str | None = None
+    # regenerate only these parts (default: everything); the others are kept from `current`
+    parts: list[Literal["titles", "captions", "hashtags"]] | None = None
+    current: dict | None = None
 
 
 @router.post("/clips/{clip_id}/content/generate")
 def generate(clip_id: str, body: GenerateRequest, db: Session = Depends(get_db)) -> dict:
-    """Draft copy (not saved): template mode, optionally rewritten by the local LLM."""
+    """Draft social copy (not saved): content analysis (speech, context, frames) → 3 titles, per-platform
+    captions, hashtags. With the local AI off/unavailable: prudent texts from the clip data only."""
     clip = _clip(db, clip_id)
     lang = body.language if body.language in ("it", "en") else None
-    content, warnings = approval.generate_content(clip, use_llm=body.use_llm, language=lang)
+    content, warnings = approval.generate_content(clip, use_llm=body.use_llm, language=lang, parts=body.parts,
+                                                  current=body.current)
     return {"content": content, "warnings": warnings}
 
 

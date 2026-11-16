@@ -1,13 +1,14 @@
-import { Archive, Bot, CheckCircle2, Clapperboard, Download, FileText, Package, RefreshCw, RotateCcw, Save, ShieldCheck, ShieldX, Wand2, XCircle } from 'lucide-react'
+import { Archive, CheckCircle2, Clapperboard, Download, FileText, Package, RefreshCw, RotateCcw, ShieldCheck, ShieldX, XCircle } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { SocialMetadataEditor } from '../components/SocialMetadataEditor'
 import { CategoryBadge } from '../components/TimelineChart'
-import { Badge, EmptyState, Field, PageHeader, Spinner, StatusBadge, FilterTabs, cx } from '../components/ui'
+import { EmptyState, PageHeader, Spinner, StatusBadge, FilterTabs, cx } from '../components/ui'
 import { useApi } from '../hooks/useApi'
 import { api } from '../services/api'
 import { PLATFORM_LABELS, formatBytes, formatDate } from '../services/format'
 import { toast } from '../stores/toastStore'
-import type { ClipContent, ExportItem, Platform, RightsDecision, ReviewItem } from '../types'
+import type { ExportItem, Platform, RightsDecision, ReviewItem } from '../types'
 
 const TABS = [
   ['review', 'In revisione'], ['approved', 'Approvate'], ['exported', 'Esportate'], ['rejected', 'Rifiutate'], ['archived', 'Archiviate'],
@@ -22,82 +23,6 @@ function Decision({ label, d }: { label: string; d: RightsDecision }) {
       </div>
       {d.blockers.map((b) => <div key={b} className="text-red-200">• {b}</div>)}
       {d.warnings.map((w) => <div key={w} className="text-amber-200">⚠ {w}</div>)}
-    </div>
-  )
-}
-
-function Counter({ value, max }: { value: string; max: number }) {
-  return <span className={cx('text-[10px]', value.length > max ? 'text-red-400' : 'text-zinc-500')}>{value.length}/{max}</span>
-}
-
-function ContentEditor({ item, onSaved }: { item: ReviewItem; onSaved: (i: ReviewItem) => void }) {
-  const [c, setC] = useState<ClipContent | null>(item.content)
-  const [tags, setTags] = useState((item.content?.hashtags ?? []).map((t) => `#${t}`).join(' '))
-  const [warnings, setWarnings] = useState<string[]>([])
-  const [busy, setBusy] = useState<string | null>(null)
-  const { data: llm } = useApi(() => api.llmStatus())
-
-  useEffect(() => { setC(item.content); setTags((item.content?.hashtags ?? []).map((t) => `#${t}`).join(' ')); setWarnings([]) }, [item.clip.id, item.content])
-
-  const gen = async (useLlm: boolean) => {
-    setBusy(useLlm ? 'llm' : 'tpl')
-    try {
-      const r = await api.generateContent(item.clip.id, useLlm, c?.language)
-      setC(r.content); setTags(r.content.hashtags.map((t) => `#${t}`).join(' ')); setWarnings(r.warnings)
-      toast.info(useLlm ? 'Bozza LLM pronta: rivedila e salva' : 'Bozza pronta: rivedila e salva')
-    } catch (e) { toast.error(e) } finally { setBusy(null) }
-  }
-  const save = async () => {
-    if (!c) return
-    setBusy('save')
-    try {
-      const hashtags = tags.split(/[\s,]+/).map((t) => t.replace(/^#/, '')).filter(Boolean)
-      const r = await api.saveContent(item.clip.id, { ...c, hashtags })
-      if (r.approval_revoked) toast.info('Testi modificati: la clip torna in revisione e va riapprovata')
-      else toast.success('Testi salvati')
-      onSaved(r)
-    } catch (e) { toast.error(e) } finally { setBusy(null) }
-  }
-
-  if (!c) {
-    return (
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm text-zinc-400">Nessun testo ancora.</span>
-        <button className="btn-cyan" onClick={() => gen(false)} disabled={!!busy}><Wand2 size={15} /> Genera testi</button>
-      </div>
-    )
-  }
-  const set = <K extends keyof ClipContent>(k: K, v: ClipContent[K]) => setC({ ...c, [k]: v })
-  return (
-    <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <select className="input w-auto py-1 text-xs" value={c.language} onChange={(e) => set('language', e.target.value as 'it' | 'en')}>
-          <option value="it">Italiano</option><option value="en">English</option>
-        </select>
-        <button className="btn-ghost px-2.5 py-1 text-xs" onClick={() => gen(false)} disabled={!!busy}><Wand2 size={13} /> Rigenera (template)</button>
-        <button className="btn-ghost px-2.5 py-1 text-xs" onClick={() => gen(true)} disabled={!!busy || !llm?.available}
-                title={llm?.available ? `LLM locale: ${llm.model}` : llm?.reason ?? 'LLM locale disabilitato (CLIPNOVA_LLM_PROVIDER=none)'}>
-          {busy === 'llm' ? <Spinner /> : <Bot size={13} />} LLM locale{llm?.available ? ` (${llm.model})` : ' (off)'}
-        </button>
-        {c.generated_by && <Badge tone="zinc">{c.generated_by}</Badge>}
-      </div>
-      {warnings.length > 0 && (
-        <ul className="rounded-lg bg-amber-500/10 p-2 text-xs text-amber-200 ring-1 ring-amber-500/30">
-          {warnings.map((w) => <li key={w}>⚠ {w}</li>)}
-        </ul>
-      )}
-      <Field label="Titolo" hint={<Counter value={c.title} max={100} />}><input className="input" value={c.title} onChange={(e) => set('title', e.target.value)} /></Field>
-      <Field label="Hook iniziale"><input className="input" value={c.hook} onChange={(e) => set('hook', e.target.value)} /></Field>
-      <Field label="Caption (TikTok / Instagram)" hint={<Counter value={c.caption} max={2200} />}>
-        <textarea className="input min-h-[70px]" value={c.caption} onChange={(e) => set('caption', e.target.value)} />
-      </Field>
-      <Field label="Descrizione (YouTube)"><textarea className="input min-h-[90px]" value={c.description} onChange={(e) => set('description', e.target.value)} /></Field>
-      <Field label="Hashtag" hint="Separati da spazio. #Shorts viene aggiunto automaticamente per YouTube.">
-        <input className="input font-mono text-xs" value={tags} onChange={(e) => setTags(e.target.value)} />
-      </Field>
-      <Field label="Call to action"><input className="input" value={c.cta} onChange={(e) => set('cta', e.target.value)} /></Field>
-      {item.attribution && <p className="text-xs text-zinc-400">Attribuzione obbligatoria, aggiunta automaticamente all'export: <b className="text-zinc-200">{item.attribution}</b></p>}
-      <button className="btn-primary" onClick={save} disabled={!!busy}><Save size={15} /> Salva testi</button>
     </div>
   )
 }
@@ -270,8 +195,8 @@ export function ApprovalCenter() {
                 </section>
 
                 <section className="card p-4">
-                  <h3 className="mb-3 font-display font-semibold text-white">Titolo, caption e hashtag</h3>
-                  <ContentEditor item={item} onSaved={(r) => { setItem(r); refresh() }} />
+                  <h3 className="mb-3 font-display font-semibold text-white">Titoli, caption e hashtag</h3>
+                  <SocialMetadataEditor item={item} onSaved={(r) => { setItem(r); refresh() }} />
                 </section>
 
                 <section className={cx('card p-4', !canExport && 'opacity-60')}>

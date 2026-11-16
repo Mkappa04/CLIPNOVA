@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.3.0 — titoli, caption e hashtag che descrivono la clip
+
+- **Analisi del contenuto prima di scrivere**: parlato con i tempi, contesto prima e dopo la clip, giudizio
+  semantico, segnali audio/video, preset e — novità — **cosa si vede nei fotogrammi** (modello visivo locale
+  `qwen3.5:4b`). Il risultato (evento, contesto, momento chiave, perché interessa, chi parla, tono, prove citate
+  alla lettera, affidabilità, "contesto insufficiente") è visibile nella revisione.
+- **3 titoli con strutture diverse** e scelta del migliore; **testi diversi per piattaforma** (caption Instagram,
+  caption TikTok, titolo e descrizione YouTube Shorts); **hashtag specifici** per piattaforma (argomento, tipo di
+  contenuto, evento, parole chiave presenti nella clip; niente #fyp/#viral automatici), quantità configurabili.
+- **Controlli**: JSON validato (Pydantic), titoli generici scartati, nomi/numeri non presenti nella clip scartati,
+  emoji limitate, riempitivi rimossi, caption diverse tra piattaforme, meno ripetizioni rispetto alle clip recenti.
+- **Robustezza**: nuovo tentativo senza vincolo JSON quando il campionatore di Ollama si blocca, e dopo i crash CUDA
+  intermittenti; testi prudenti costruiti solo dai dati quando l'AI non è disponibile; nessun testo inventato
+  quando la clip non ha né parlato né immagini descrivibili.
+- **Revisione**: modifica e copia di ogni testo, editor degli hashtag, rigenerazione separata di titoli, caption o
+  hashtag; l'export usa i testi di ciascuna piattaforma. Compatibile con i testi salvati in precedenza.
+- `scripts/eval_metadata.py`: valutazione della qualità con il modello reale su 8 scenari.
+
 ## 1.2.0 — montaggio automatico
 
 - **Preset di editing**: Gaming Dynamic, Sports Highlights, Podcast Clean, cioè parametri dell'editor e regole del

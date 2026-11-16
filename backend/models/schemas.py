@@ -242,6 +242,8 @@ class ContentIn(BaseModel):
     description: str = Field("", max_length=5000)
     hashtags: list[str] = Field(default_factory=list, max_length=30)
     cta: str = Field("", max_length=150)
+    # 1.3+: analysis, 3 titles, per-platform captions/hashtags (validated as SocialMetadata on save)
+    metadata: dict | None = None
 
 
 class ReviewAction(BaseModel):

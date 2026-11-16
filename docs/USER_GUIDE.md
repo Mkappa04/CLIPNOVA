@@ -27,7 +27,9 @@ Facoltativo: `scripts/install-service.sh` avvia CLIPNOVA automaticamente con WSL
    *Anteprima* = video completo in bozza da guardare subito; *Render* = qualità finale; *Rigenera* su ogni render.
    Il logo si carica una volta sola in **Brand Kit**.
 4. **Subtitle Editor**: correggi il testo dei sottotitoli; poi rifai il render.
-5. **Approval Center**: guarda il video finale, genera/modifica titolo, caption e hashtag, **Approva**.
+5. **Approval Center**: guarda il video finale; *Genera* (circa 1 minuto): l'AI guarda la clip e propone 3 titoli,
+   caption per Instagram e TikTok, titolo e descrizione YouTube e hashtag per ogni piattaforma. Apri "Cosa ha capito
+   l'AI" per controllare l'interpretazione; modifica, copia o rigenera solo titoli, caption o hashtag; **Approva**.
 6. **Export**: scegli piattaforme e uso (commerciale o no) → pacchetto con video, testi, sottotitoli e checklist.
    Carica tu il video seguendo `CHECKLIST.txt`.
 7. **Published Content**: storico degli export; la pubblicazione via API è disabilitata di default.

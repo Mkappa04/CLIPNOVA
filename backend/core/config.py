@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "CLIPNOVA"
-    version: str = "1.2.0"
+    version: str = "1.3.0"
 
     host: str = "127.0.0.1"
     port: int = 8000
@@ -89,6 +89,14 @@ class Settings(BaseSettings):
     semantic_scoring: str = "auto"
     # Model for semantic clip judgement (bigger = better story understanding); falls back to llm_model
     semantic_model: str = "qwen3:8b"
+    # Vision model (Ollama) that describes the clip frames for the social copy generator ("" = off)
+    vision_model: str = "qwen3.5:4b"
+    # Social copy generator: "auto" = local LLM when available, "off" = deterministic texts only
+    metadata_ai: str = "auto"
+    # Hashtags per platform: [min, max]
+    hashtags_instagram: tuple[int, int] = (3, 5)
+    hashtags_tiktok: tuple[int, int] = (3, 5)
+    hashtags_youtube: tuple[int, int] = (2, 4)
     # Embedding model used to learn your taste from approved/rejected clips (multilingual, small)
     preference_embed_model: str = "embeddinggemma"
 

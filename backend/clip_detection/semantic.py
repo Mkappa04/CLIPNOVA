@@ -167,6 +167,11 @@ def _generate(client: httpx.Client, model: str, prompt: str, *, temperature: flo
     restarting it, so retry once after a short pause."""
     body = {"model": model, "prompt": prompt, "stream": False, "format": "json", "think": False,
             "keep_alive": keep_alive, "options": {"temperature": temperature, "num_ctx": NUM_CTX}}
+    return _generate_raw(client, body, timeout=timeout)
+
+
+def _generate_raw(client: httpx.Client, body: dict, *, timeout: float | None = None) -> dict:
+    """POST /api/generate with a complete body (JSON mode); one retry on 5xx / connection errors."""
     for attempt in (1, 2):
         try:
             r = client.post(f"{get_settings().llm_url}/api/generate", json=body,
@@ -180,6 +185,21 @@ def _generate(client: httpx.Client, model: str, prompt: str, *, temperature: flo
             log.info("Ollama error (%s), retrying in %.0f s", e, _RETRY_WAIT_S)
             time.sleep(_RETRY_WAIT_S)
     raise AssertionError("unreachable")
+
+
+def wait_unloaded(client: httpx.Client, model: str, timeout_s: float = 20.0) -> None:
+    """Block until Ollama has really released `model` (GET /api/ps). Loading another model while the
+    previous one is still being freed is what crashes the runner on a 6 GB GPU."""
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        try:
+            r = client.get(f"{get_settings().llm_url}/api/ps", timeout=5)
+            names = [m.get("name", "") for m in r.json().get("models", [])]
+            if not any(n == model or n.split(":")[0] == model.split(":")[0] for n in names):
+                return
+        except (httpx.HTTPError, ValueError):
+            return
+        time.sleep(0.5)
 
 
 def _unload(client: httpx.Client, model: str) -> None:

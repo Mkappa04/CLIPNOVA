@@ -285,6 +285,21 @@ Limiti onesti: il tracking segue movimento o volti, non riconosce la palla; il "
 stimato dal movimento della bocca (niente diarizzazione); l'LLM locale tende a essere parco di effetti (scelta
 voluta: meglio "none" che effetti a caso). Il piano con LLM richiede ~35–40 s per clip con `qwen3:8b`.
 
+### Titoli, caption e hashtag (1.3)
+Nell'**Approval Center** CLIPNOVA prima *capisce* la clip, poi scrive. L'analisi usa il parlato con i tempi, il
+contesto prima e dopo, il giudizio semantico, i segnali audio/video e cosa si vede nei fotogrammi (modello visivo
+locale): ne escono evento, contesto, momento chiave, tono e le frasi realmente dette che lo provano. Su questa base
+vengono proposti 3 titoli con strutture diverse, una caption per Instagram, una per TikTok, titolo e descrizione per
+YouTube Shorts e hashtag specifici per piattaforma (quantità in `.env`: `CLIPNOVA_HASHTAGS_*`). Ogni parte si
+modifica, si copia e si rigenera da sola. I testi passano da controlli automatici: niente titoli generici
+("Incredibile!"), niente nomi o numeri che non compaiono nella clip, niente #fyp automatici, emoji contenute.
+Senza AI (o se fallisce) i testi sono prudenti e costruiti solo dai dati; senza parlato né immagini descrivibili non
+viene inventato nulla e ti viene chiesto di scrivere tu.
+Limiti onesti: chi parla non viene riconosciuto per nome (manca la diarizzazione) — si usa il creator solo se
+indicato; il modello da 8B può fare piccoli errori di grammatica; un nome inventato a inizio frase può sfuggire al
+controllo automatico (resta la revisione); ~45–60 s per clip con `qwen3:8b` + `qwen3.5:4b`.
+Valutazione: `.venv/bin/python scripts/eval_metadata.py` (8 scenari, modello reale).
+
 ### Note tecniche: crash CUDA della trascrizione
 Su questo PC (RTX 3060 Laptop, driver Windows 610.74, WSL 2) CTranslate2 va in errore CUDA
 (`cudaErrorIllegalAddress` / `IllegalInstruction`) dopo decine di secondi di inferenza continua su audio reale,

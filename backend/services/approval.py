@@ -9,16 +9,21 @@ IMPORT → ANALYSIS → CLIP DETECTION → EDITING → RENDERING → REVIEW → 
 
 from __future__ import annotations
 
-from backend.clip_detection.pipeline import load_transcript
-from backend.content_generation import llm, templates
+from collections import Counter
+
+from pydantic import ValidationError
+from sqlalchemy import select
+from sqlalchemy.orm import object_session
+
+from backend.content_generation import metadata, vision
+from backend.content_generation.context import build_context
 from backend.core.config import get_settings
 from backend.core.exceptions import ValidationFailed
 from backend.core.timeutil import utcnow
 from backend.models.entities import Clip, ClipStatus, LicenseType, Render, RenderStatus
 from backend.rights_management.policy import Purpose, evaluate
-from backend.subtitles.cues import clip_words
 
-CONTENT_FIELDS = ("language", "title", "hook", "caption", "description", "hashtags", "cta")
+CONTENT_FIELDS = ("language", "title", "hook", "caption", "description", "hashtags", "cta", "metadata")
 APPROVED_STATES = (ClipStatus.APPROVED.value, ClipStatus.EXPORTED.value)
 
 
@@ -44,40 +49,89 @@ def attribution_text(clip: Clip) -> str:
     return r.attribution_text.strip() if needs else ""
 
 
-def _facts(clip: Clip) -> dict:
-    transcript = clip.transcript
-    if not transcript:
-        words = clip_words(load_transcript(clip.video_id), clip.start, clip.end)
-        transcript = " ".join(w["word"] for w in words)
-    return {"category": clip.category, "transcript": transcript, "keywords": list(clip.keywords or []),
-            "game": clip.video.game, "creator": clip.video.creator}
+def _recent(clip: Clip, n: int = 30) -> tuple[list[str], Counter]:
+    """Titles and hashtags of the most recent other clips: the generator avoids repeating them."""
+    db = object_session(clip)
+    if db is None:
+        return [], Counter()
+    rows = db.scalars(select(Clip.content).where(Clip.id != clip.id, Clip.content.is_not(None))
+                      .order_by(Clip.updated_at.desc()).limit(n)).all()
+    titles: list[str] = []
+    tags: Counter = Counter()
+    for c in rows:
+        if not c:
+            continue
+        if c.get("title"):
+            titles.append(c["title"])
+        plat = ((c.get("metadata") or {}).get("platforms") or {})
+        used = {t.lower() for p in plat.values() for t in (p.get("hashtags") or [])} or \
+            {t.lower() for t in c.get("hashtags") or []}
+        tags.update(used)
+    return titles, tags
 
 
-def generate_content(clip: Clip, *, use_llm: bool = False, language: str | None = None) -> tuple[dict, list[str]]:
-    facts = _facts(clip)
+def generate_content(clip: Clip, *, use_llm: bool = True, language: str | None = None,
+                     parts: list[str] | None = None, current: dict | None = None) -> tuple[dict, list[str]]:
+    """Social copy: content analysis → 3 titles + per-platform captions + hashtags (see content_generation).
+
+    `parts` (titles | captions | hashtags) regenerates only those, keeping the rest of `current`
+    (the metadata dict being edited, else the stored one)."""
     lang = language or clip_language(clip)
-    content = templates.generate(**facts, language=lang, attribution=attribution_text(clip))
-    warnings: list[str] = []
-    if not facts["transcript"]:
-        warnings.append("Nessun parlato nella clip: testo generico basato su gioco e categoria")
-    if use_llm:
-        try:
-            content, w = llm.rewrite(content, language=lang, **facts)
-            warnings += w
-        except llm.LLMUnavailable as e:
-            warnings.append(f"LLM locale non disponibile, uso i template: {e}")
+    visual = vision.describe(clip) if use_llm and metadata.text_model() else {}
+    ctx = build_context(clip, language=lang, attribution=attribution_text(clip), visual=visual)
+    stored = (clip.content or {}).get("metadata") or {}
+    titles, tags = _recent(clip)
+    if visual:  # vision model done: free its VRAM before the text model loads
+        import httpx
+
+        from backend.clip_detection.semantic import wait_unloaded
+        with httpx.Client() as c:
+            wait_unloaded(c, visual.get("model", ""))
+    meta, warnings = metadata.generate(ctx, parts=parts, current=current or stored, recent_titles=titles,
+                                       recent_tags=tags, use_ai=use_llm)
+    content = {**meta.legacy(), "metadata": meta.model_dump(), "generated_by": meta.generated_by}
+    if not ctx.transcript:
+        warnings.insert(0, "Nessun parlato nella clip: i testi si basano su ciò che si vede e sui dati del video")
     return content, warnings
 
 
 def ensure_content(clip: Clip) -> dict:
+    """Content for export/approval when none was generated: fast, without the AI (prudent texts)."""
     if not clip.content:
-        clip.content, _ = generate_content(clip)
+        clip.content, _ = generate_content(clip, use_llm=False)
     return clip.content
 
 
 def set_content(clip: Clip, content: dict) -> bool:
     """Save copy; returns True if an existing approval was revoked."""
     clean = {k: content.get(k) for k in CONTENT_FIELDS if k in content}
+    if clean.get("metadata"):
+        try:
+            meta = metadata.SocialMetadata.model_validate(clean["metadata"])
+        except ValidationError as e:
+            raise ValidationFailed(f"Metadati non validi: {e.errors()[0].get('msg', e)}") from e
+        legacy = meta.legacy()
+        prev = clip.content or {}
+        # a client that edits only the classic fields (title/caption/hashtags) next to an unchanged
+        # metadata block: the classic edit wins and is copied into the metadata
+        def edited(k: str) -> bool:
+            return k in clean and clean[k] != legacy[k] and clean[k] != prev.get(k)
+        if edited("title"):
+            t = str(clean["title"])[:100]
+            meta.titles.options = [t] + [o for o in meta.titles.options if o != t][:2]
+            meta.titles.selected = t
+        if edited("caption"):
+            meta.platforms.instagram.caption = str(clean["caption"])
+        if edited("hashtags"):
+            meta.platforms.instagram.hashtags = metadata.dedupe_tags([str(t) for t in clean["hashtags"]])
+        meta = metadata.SocialMetadata.model_validate(meta.model_dump())
+        clean["metadata"] = meta.model_dump()
+        legacy = meta.legacy()
+        clean.update({k: legacy[k] for k in ("title", "caption", "description", "hook")})
+        if not edited("hashtags"):
+            clean["hashtags"] = legacy["hashtags"]
+    elif "metadata" in clean:
+        clean.pop("metadata")
     tags = clean.get("hashtags") or []
     clean["hashtags"] = [str(t).lstrip("#").strip() for t in tags if str(t).strip("# ")][:30]
     previous = clip.content or {}

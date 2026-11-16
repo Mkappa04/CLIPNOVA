@@ -108,8 +108,22 @@ def generate(*, category: str, transcript: str, keywords: list[str], game: str, 
             "hashtags": hashtags, "cta": cta, "category": category, "generated_by": "template"}
 
 
+META_KEY = {"tiktok": "tiktok", "instagram": "instagram", "youtube": "youtube_shorts"}
+
+
 def for_platform(content: dict, platform: str, attribution: str = "") -> dict:
-    """Platform-specific text respecting length limits; attribution is always kept."""
+    """Platform-specific text respecting length limits; attribution is always kept.
+
+    Content generated since 1.3 carries per-platform texts in content["metadata"]["platforms"]; older
+    content (one caption for every platform) still works."""
+    pl = ((content.get("metadata") or {}).get("platforms") or {}).get(META_KEY.get(platform, platform))
+    if pl:
+        content = {**content, "hashtags": pl.get("hashtags") or content.get("hashtags", [])}
+        if platform == "youtube":
+            content["title"] = pl.get("title") or content.get("title", "")
+            content["description"] = pl.get("description") or content.get("description", "")
+        else:
+            content["caption"] = pl.get("caption") or content.get("caption", "")
     tags = content.get("hashtags", [])
     lim = PLATFORM_LIMITS.get(platform, {"caption": 2200, "hashtags": 10})
     tags = tags[: lim.get("hashtags", 10)]

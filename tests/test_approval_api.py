@@ -33,9 +33,10 @@ def rendered(client, gameplay_video):
 def test_generate_and_save_content(client, rendered):
     _, cid = rendered
     g = client.post(f"/api/clips/{cid}/content/generate", json={"use_llm": False}).json()
-    assert g["content"]["generated_by"] == "template"
-    title = g["content"]["title"]
-    assert "“" in title, title
+    assert g["content"]["generated_by"] == "rules"                  # no AI → prudent texts from the clip data
+    meta = g["content"]["metadata"]
+    assert len(meta["titles"]["options"]) >= 2 and g["content"]["title"] == meta["titles"]["selected"]
+    title = next(t for t in meta["titles"]["options"] if "“" in t)
     quoted = title.split("“")[1].split("”")[0]
 
     def norm(t):

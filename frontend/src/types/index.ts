@@ -418,6 +418,37 @@ export interface ClipContent {
   cta: string
   category?: string
   generated_by?: string
+  metadata?: SocialMetadata | null
+}
+
+export type MetadataPart = 'titles' | 'captions' | 'hashtags'
+
+export interface ContentAnalysis {
+  category: string
+  subject: string
+  event: string
+  context: string
+  key_moment: string
+  why_interesting: string
+  speaker: string
+  tone: string
+  emotion: string
+  evidence: string[]
+  confidence: number
+  insufficient_context: boolean
+  source: 'llm' | 'rules'
+}
+
+export interface SocialPost { caption: string; hashtags: string[] }
+
+export interface SocialMetadata {
+  version: number
+  language: 'it' | 'en'
+  content_analysis: ContentAnalysis
+  titles: { options: string[]; selected: string }
+  platforms: { instagram: SocialPost; tiktok: SocialPost; youtube_shorts: { title: string; description: string; hashtags: string[] } }
+  generated_by: string
+  visual_used: boolean
 }
 
 export interface ReviewItem {
