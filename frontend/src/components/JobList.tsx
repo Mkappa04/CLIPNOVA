@@ -13,21 +13,21 @@ export function JobList({ jobs, onChange, compact }: { jobs: Job[]; onChange?: (
       onChange?.()
     } catch (e) { toast.error(e) }
   }
-  if (!jobs.length) return <p className="py-6 text-center text-sm text-zinc-500">Nessun job.</p>
+  if (!jobs.length) return <p className="py-6 text-sm text-graphite-400">Nessuna elaborazione.</p>
   return (
-    <ul className="divide-y divide-ink-700">
+    <ul className="divide-y divide-graphite-800">
       {jobs.map((j) => {
         const active = j.status === 'queued' || j.status === 'running'
         return (
           <li key={j.id} className="flex items-center gap-4 py-3">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-sm font-medium text-zinc-100">{JOB_LABELS[j.type] ?? j.type}</span>
+                <span className="text-sm font-medium text-bone-100">{JOB_LABELS[j.type] ?? j.type}</span>
                 <StatusBadge status={j.status} />
-                <span className="text-xs text-zinc-500">{timeAgo(j.created_at)}</span>
+                <span className="timecode ml-auto text-2xs text-graphite-500">{timeAgo(j.created_at)}</span>
               </div>
               {(active || !compact) && (
-                <p className="mt-0.5 truncate text-xs text-zinc-400">{j.error ?? j.message}</p>
+                <p className={`mt-1 truncate text-xs ${j.error ? 'text-err' : 'text-graphite-400'}`}>{j.error ?? j.message}</p>
               )}
               {active && <ProgressBar value={j.progress} className="mt-2" />}
             </div>

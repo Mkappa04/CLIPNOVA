@@ -98,7 +98,7 @@ export function Discovery() {
 
       {res?.enabled && res.results.length === 0 && <EmptyState icon={<Search size={26} />} title="Nessun risultato" />}
       {res?.enabled && res.results.length > 0 && (
-        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
           <ul className="space-y-2">{res.results.map((it) => <ItemCard key={`${it.platform}-${it.id}`} it={it} />)}</ul>
           <section className="card h-fit p-4">
             <h2 className="mb-3 font-display font-semibold text-white">Creator più adatti</h2>

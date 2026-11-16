@@ -1,7 +1,7 @@
 import { Copy, FileCheck2, FolderPlus, MessageSquareText, Plus, Trash2, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Toggle } from '../components/EditorControls'
-import { Badge, EmptyState, Field, PageHeader, cx } from '../components/ui'
+import { Badge, EmptyState, Field, PageHeader, FilterTabs, cx } from '../components/ui'
 import { useApi } from '../hooks/useApi'
 import { api } from '../services/api'
 import { formatDate } from '../services/format'
@@ -156,14 +156,9 @@ export function Creators() {
         <Field label="Link canale"><input className="input w-72" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.twitch.tv/..." /></Field>
         <button className="btn-cyan" disabled={!name.trim()} onClick={add}><Plus size={15} /> Aggiungi creator</button>
       </div>
-      <div className="mb-4 flex flex-wrap gap-2">
-        <button className={cx('rounded-full px-3 py-1 text-sm ring-1', !filter ? 'bg-nova-600 text-white ring-nova-500' : 'text-zinc-400 ring-ink-600')} onClick={() => setFilter('')}>Tutti</button>
-        {STATUSES.map(([k, l]) => (
-          <button key={k} className={cx('rounded-full px-3 py-1 text-sm ring-1', filter === k ? 'bg-nova-600 text-white ring-nova-500' : 'text-zinc-400 ring-ink-600')} onClick={() => setFilter(k)}>
-            {l} {(creators ?? []).filter((c) => c.status === k).length}
-          </button>
-        ))}
-      </div>
+      <FilterTabs label="Stato dei permessi" value={filter} onChange={setFilter}
+        options={[{ value: '', label: 'Tutti', count: (creators ?? []).length },
+          ...STATUSES.map(([k, l]) => ({ value: k, label: l, count: (creators ?? []).filter((c) => c.status === k).length }))]} />
       {creators && list.length === 0 && <EmptyState icon={<Users size={26} />} title="Nessun creator" text="Aggiungili a mano o dalla pagina Discovery." />}
       <ul className="space-y-3">{list.map((c) => <CreatorCard key={c.id} c={c} onChanged={reload} />)}</ul>
     </>

@@ -2,7 +2,7 @@ import { Archive, Bot, CheckCircle2, Clapperboard, Download, FileText, Package, 
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CategoryBadge } from '../components/TimelineChart'
-import { Badge, EmptyState, Field, PageHeader, Spinner, StatusBadge, cx } from '../components/ui'
+import { Badge, EmptyState, Field, PageHeader, Spinner, StatusBadge, FilterTabs, cx } from '../components/ui'
 import { useApi } from '../hooks/useApi'
 import { api } from '../services/api'
 import { PLATFORM_LABELS, formatBytes, formatDate } from '../services/format'
@@ -198,14 +198,7 @@ export function ApprovalCenter() {
   return (
     <>
       <PageHeader title="Approval Center" subtitle="Niente viene esportato o pubblicato senza la tua approvazione esplicita" />
-      <div className="mb-4 flex flex-wrap gap-2">
-        {TABS.map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)}
-            className={cx('rounded-full px-3 py-1 text-sm ring-1 transition', tab === k ? 'bg-nova-600 text-white ring-nova-500' : 'text-zinc-400 ring-ink-600 hover:text-white')}>
-            {l} <span className="ml-1 text-xs opacity-70">{counts?.[k] ?? 0}</span>
-          </button>
-        ))}
-      </div>
+      <FilterTabs label="Stato delle clip" value={tab} onChange={setTab} options={TABS.map(([k, l]) => ({ value: k, label: l, count: counts?.[k] ?? 0 }))} />
 
       {!items && <Spinner />}
       {items && list.length === 0 && (
@@ -215,7 +208,7 @@ export function ApprovalCenter() {
       )}
 
       {list.length > 0 && (
-        <div className="grid gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[280px_minmax(0,1fr)]">
           <ul className="space-y-2">
             {list.map((i) => (
               <li key={i.clip.id}>
@@ -235,7 +228,7 @@ export function ApprovalCenter() {
           </ul>
 
           {item && (
-            <div className="grid gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
+            <div className="grid grid-cols-1 gap-5 xl:grid-cols-[300px_minmax(0,1fr)]">
               <div className="space-y-3">
                 {item.render ? (
                   <video key={item.render.id} controls src={api.renderFileUrl(item.render.id)}

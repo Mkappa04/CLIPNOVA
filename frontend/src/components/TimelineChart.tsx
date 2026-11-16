@@ -101,8 +101,8 @@ export function TimelineChart({ timeline, duration, clips, selectedId, onSelect 
         ))}
 
         {/* interest series */}
-        <path d={area} fill="#22d3ee" opacity={0.12} />
-        <path d={line} fill="none" stroke="#22d3ee" strokeWidth={2} strokeLinejoin="round" />
+        <path d={area} fill="#e6e0d6" opacity={0.08} />
+        <path d={line} fill="none" stroke="#e6e0d6" strokeWidth={1.5} strokeLinejoin="round" />
 
         {/* speech strip */}
         <text x={M.left - 6} y={speechTop + SPEECH_H} textAnchor="end" className="fill-zinc-500 text-[9px]">voce</text>
@@ -121,7 +121,7 @@ export function TimelineChart({ timeline, duration, clips, selectedId, onSelect 
         {hover && (
           <g pointerEvents="none">
             <line x1={hover.x} x2={hover.x} y1={M.top} y2={speechTop + SPEECH_H} stroke="#c3c2b7" strokeWidth={1} strokeDasharray="3 3" />
-            <circle cx={hover.x} cy={y(timeline.interest[idx] ?? 0)} r={4} fill="#22d3ee" stroke="#0a0a12" strokeWidth={2} />
+            <circle cx={hover.x} cy={y(timeline.interest[idx] ?? 0)} r={4} fill="#ff5a1f" stroke="#0c0b0a" strokeWidth={2} />
           </g>
         )}
       </svg>
@@ -162,9 +162,9 @@ export function CategoryLegend({ categories }: { categories: string[] }) {
 export function CategoryBadge({ category }: { category: string }) {
   const c = CATEGORY_BY_ID[category]
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-ink-800 px-2 py-0.5 text-[11px] font-semibold text-zinc-200 ring-1 ring-ink-600">
-      <span className="h-2 w-2 rounded-full" style={{ background: c?.color }} />
-      {c ? `${c.emoji} ${c.label}` : category}
+    <span className="inline-flex items-center gap-1.5 rounded-sm bg-graphite-850 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-bone-200 ring-1 ring-inset ring-graphite-700">
+      <span className="h-2 w-2 rounded-[1px]" style={{ background: c?.color }} />
+      {c ? c.label : category}
     </span>
   )
 }

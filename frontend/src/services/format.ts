@@ -41,6 +41,7 @@ export const JOB_LABELS: Record<string, string> = {
   'render.clip': 'Render verticale 9:16',
   'publish.post': 'Pubblicazione social',
   'auto.pipeline': 'Pipeline automatica (import → render)',
+  'edit.plan': 'Piano di montaggio AI',
 }
 
 export const LICENSE_LABELS: Record<string, string> = {

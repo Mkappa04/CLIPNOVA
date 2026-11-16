@@ -65,16 +65,16 @@ export function Analytics() {
             <Tile label="Tasso di approvazione" value={data.kpi.approval_rate == null ? '—' : `${Math.round(data.kpi.approval_rate * 100)}%`} sub="approvate / renderizzate" />
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <Panel title="Render completati al giorno">
               <ColumnChart label="Render" data={data.daily.map((d) => ({ key: d.day, label: d.day.slice(5).split('-').reverse().join('/'), value: d.renders }))} />
             </Panel>
             <Panel title="Video importati al giorno">
-              <ColumnChart label="Video" color="#22d3ee" data={data.daily.map((d) => ({ key: d.day, label: d.day.slice(5).split('-').reverse().join('/'), value: d.videos }))} />
+              <ColumnChart label="Video" color="#cfc7ba" data={data.daily.map((d) => ({ key: d.day, label: d.day.slice(5).split('-').reverse().join('/'), value: d.videos }))} />
             </Panel>
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <Panel title="Workflow" note="Quante clip arrivano a ogni fase (da sempre)">
               <BarList max={data.funnel[0]?.count} rows={data.funnel.map((f) => ({ key: f.stage, label: STAGES[f.stage] ?? f.stage, value: f.count }))} />
             </Panel>
@@ -88,7 +88,7 @@ export function Analytics() {
             </Panel>
           </div>
 
-          <div className="grid gap-5 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
             <Panel title="Prestazioni analisi" note={p?.analysis_s_per_video_min != null ? `${p.analysis_s_per_video_min} s di elaborazione per minuto di video (${p.analyses} analisi)` : 'Nessuna analisi completata'}>
               <BarList format={(v) => `${v.toFixed(2)} s/min`} rows={Object.entries(p?.analysis_stages_s_per_min ?? {}).map(([k, v]) => ({ key: k, label: ANALYSIS_STAGES[k] ?? k, value: v }))} />
               {p && Object.keys(p.transcription_devices).length > 0 && (

@@ -99,7 +99,7 @@ export function Settings() {
       {error && <ErrorBox error={error} onRetry={reload} />}
       {!sys && !error && <Spinner />}
       {sys && (
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <Panel title="Ambiente" icon={<Cpu size={18} />}>
             <Row k="WSL 2" v={yes(sys.is_wsl2)} />
             <Row k="Distribuzione" v={sys.distro} />

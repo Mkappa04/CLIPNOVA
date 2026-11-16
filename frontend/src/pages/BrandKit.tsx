@@ -62,7 +62,7 @@ export function BrandKit() {
   return (
     <>
       <PageHeader title="Brand Kit" subtitle="Il tuo logo, applicato in modo identico a tutti i video (overlay FFmpeg, mai modificato dall'AI)" />
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="card space-y-4 p-4">
           <Section title="Logo">
             {kit.logo ? (

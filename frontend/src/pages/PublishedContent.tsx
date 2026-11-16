@@ -172,7 +172,7 @@ export function PublishedContent() {
       </section>
 
       {status && (
-        <div className="grid gap-5 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
           <section className="card p-4">
             <h2 className="mb-3 flex items-center gap-2 font-display font-semibold text-white"><KeyRound size={16} className="text-nova-400" /> Account (API ufficiali)</h2>
             <ul className="mb-4 space-y-2">

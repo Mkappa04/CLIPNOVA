@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { RenderCard } from './ClipEditor'
 import { JobList } from '../components/JobList'
-import { ErrorBox, PageHeader, cx } from '../components/ui'
+import { ErrorBox, FilterTabs, PageHeader } from '../components/ui'
 import { useApi } from '../hooks/useApi'
 import { api } from '../services/api'
 
@@ -20,14 +20,7 @@ export function RenderQueue() {
   return (
     <>
       <PageHeader title="Render Queue" subtitle="Tutti i job di elaborazione (import, analisi, rendering) e i video verticali prodotti" />
-      <div className="mb-4 flex flex-wrap gap-2">
-        {FILTERS.map(([k, l]) => (
-          <button key={l} onClick={() => setFilter(k)}
-            className={cx('rounded-full px-3 py-1 text-sm ring-1 transition', filter === k ? 'bg-nova-600 text-white ring-nova-500' : 'text-zinc-400 ring-ink-600 hover:text-white')}>
-            {l}
-          </button>
-        ))}
-      </div>
+      <FilterTabs label="Filtra elaborazioni" value={filter} onChange={setFilter} options={FILTERS.map(([k, l]) => ({ value: k, label: l }))} />
       {error && <ErrorBox error={error} onRetry={reload} />}
       <div className="card px-4"><JobList jobs={data ?? []} onChange={reload} /></div>
 

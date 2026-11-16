@@ -225,7 +225,9 @@ def run_render_job(ctx, clip_id: str) -> dict:
             if c is not None:
                 c.status = clip_status
 
-    ctx.progress(0.01, "AI Editing Planner: analisi della clip", force=True)
+    llm = cs.config.planner == "auto" and not (cs.stored_plan and cs.stored_plan.get("source") == "llm")
+    ctx.progress(0.01, "AI Editing Planner: il modello locale sta decidendo il montaggio (30–90 s)" if llm
+                 else "AI Editing Planner: analisi della clip", force=True)
     try:
         edit = plan_and_store(cs, clip_id)
         ctx.progress(0.04, f"Piano pronto ({edit.source}): {edit.summary()['effects'] or 'nessun effetto'}", force=True)

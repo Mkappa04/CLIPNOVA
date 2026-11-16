@@ -1,9 +1,11 @@
 import { Crosshair, ScanFace, Trash2 } from 'lucide-react'
-import { useRef, useState, type ReactNode } from 'react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 import { api } from '../services/api'
 import { toast } from '../stores/toastStore'
 import type { Layout, Region, SubtitlePreset } from '../types'
 import { cx } from './ui'
+import { Slider as RangeSlider } from './ui/slider'
+import { Switch } from './ui/switch'
 
 /* ------------------------------------------------------------ layout picker */
 const LAYOUTS: { id: Layout; letter: string; name: string; desc: string; webcam: boolean }[] = [
@@ -14,7 +16,7 @@ const LAYOUTS: { id: Layout; letter: string; name: string; desc: string; webcam:
 ]
 
 function Schematic({ id }: { id: Layout }) {
-  const g = 'fill-nova-500/50', w = 'fill-pulse-400/70'
+  const g = 'fill-bone-500/40', w = 'fill-tally-500/80'
   return (
     <svg viewBox="0 0 27 48" className="h-14 w-8 shrink-0 rounded-[3px] ring-1 ring-ink-600" aria-hidden>
       <rect width="27" height="48" className="fill-ink-800" />
@@ -34,7 +36,7 @@ export function LayoutPicker({ value, hasWebcam, onChange }: { value: Layout; ha
         return (
           <button key={l.id} onClick={() => onChange(l.id)} title={disabled ? 'Serve la regione webcam' : l.desc}
             className={cx('flex items-center gap-3 rounded-lg p-2 text-left ring-1 transition',
-              value === l.id ? 'bg-nova-500/15 ring-nova-500' : 'ring-ink-600 hover:bg-ink-800', disabled && 'opacity-50')}>
+              value === l.id ? 'bg-graphite-850 ring-tally-500' : 'ring-graphite-700 hover:bg-graphite-850', disabled && 'opacity-50')}>
             <Schematic id={l.id} />
             <span>
               <span className="block text-sm font-semibold text-white">{l.letter} · {l.name}</span>
@@ -115,9 +117,9 @@ export function WebcamSelector({ videoId, t, region, onSaved }: {
 /* ------------------------------------------------------------ small controls */
 export function Section({ title, children, right }: { title: string; children: ReactNode; right?: ReactNode }) {
   return (
-    <section className="space-y-3 border-b border-ink-700 pb-4 last:border-0">
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-xs font-semibold uppercase tracking-wider text-pulse-300">{title}</h3>
+    <section className="space-y-3.5 border-b border-graphite-800 pb-5 last:border-0 last:pb-0">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="eyebrow text-bone-400">{title}</h3>
         {right}
       </div>
       {children}
@@ -126,11 +128,15 @@ export function Section({ title, children, right }: { title: string; children: R
 }
 
 export function Toggle({ label, checked, onChange, hint }: { label: string; checked: boolean; onChange: (v: boolean) => void; hint?: string }) {
+  const id = useId()
   return (
-    <label className="flex items-start gap-2.5 text-sm text-zinc-200" title={hint}>
-      <input type="checkbox" className="mt-0.5 accent-nova-500" checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span>{label}{hint && <span className="block text-xs text-zinc-500">{hint}</span>}</span>
-    </label>
+    <div className="flex items-start justify-between gap-3 py-0.5">
+      <label htmlFor={id} className="cursor-pointer text-sm text-bone-200">
+        {label}
+        {hint && <span className="mt-0.5 block text-xs leading-snug text-graphite-400">{hint}</span>}
+      </label>
+      <Switch id={id} checked={checked} onCheckedChange={onChange} className="mt-0.5" />
+    </div>
   )
 }
 
@@ -138,11 +144,11 @@ export function Slider({ label, value, min, max, step, onChange, fmt }: {
   label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; fmt?: (v: number) => string
 }) {
   return (
-    <label className="grid grid-cols-[110px_1fr_48px] items-center gap-2 text-sm">
-      <span className="text-zinc-300">{label}</span>
-      <input type="range" min={min} max={max} step={step} value={value} className="accent-nova-500" onChange={(e) => onChange(Number(e.target.value))} />
-      <span className="text-right font-mono text-xs text-zinc-400">{fmt ? fmt(value) : value}</span>
-    </label>
+    <div className="grid grid-cols-[minmax(84px,auto)_1fr_52px] items-center gap-3 text-sm">
+      <span className="text-bone-300">{label}</span>
+      <RangeSlider value={[value]} min={min} max={max} step={step} onValueChange={(v) => onChange(v[0])} aria-label={label} />
+      <span className="timecode text-right text-xs text-bone-200">{fmt ? fmt(value) : value}</span>
+    </div>
   )
 }
 
@@ -150,10 +156,11 @@ export function Segmented<T extends string | number>({ value, options, onChange 
   value: T; options: { value: T; label: string }[]; onChange: (v: T) => void
 }) {
   return (
-    <div className="inline-flex flex-wrap rounded-lg bg-ink-850 p-0.5 ring-1 ring-ink-700">
+    <div className="inline-flex max-w-full flex-wrap rounded-md border border-graphite-700 bg-graphite-900 p-0.5" role="radiogroup">
       {options.map((o) => (
-        <button key={String(o.value)} onClick={() => onChange(o.value)}
-          className={cx('rounded-md px-2.5 py-1 text-xs font-medium transition', value === o.value ? 'bg-nova-600 text-white' : 'text-zinc-400 hover:text-white')}>
+        <button key={String(o.value)} onClick={() => onChange(o.value)} role="radio" aria-checked={value === o.value}
+          className={cx('rounded-[3px] px-2.5 py-1 text-xs font-medium transition-colors',
+            value === o.value ? 'bg-graphite-700 text-bone-100 shadow-[inset_0_-2px_0_#ff5a1f]' : 'text-graphite-400 hover:text-bone-200')}>
           {o.label}
         </button>
       ))}
@@ -166,7 +173,7 @@ export function PresetPicker({ presets, value, onChange }: { presets: SubtitlePr
     <div className="grid grid-cols-3 gap-2">
       {presets.map((p) => (
         <button key={p.id} onClick={() => onChange(p.id)}
-          className={cx('rounded-lg bg-ink-950 px-2 py-3 text-center ring-1 transition', value === p.id ? 'ring-nova-500' : 'ring-ink-600 hover:ring-ink-500')}>
+          className={cx('rounded-md bg-[#050505] px-2 py-3 text-center ring-1 ring-inset transition', value === p.id ? 'ring-tally-500' : 'ring-graphite-700 hover:ring-graphite-500')}>
           <span className="block text-sm font-black tracking-wide" style={{ color: p.primary, WebkitTextStroke: '0.6px #000', textShadow: '0 2px 0 #000' }}>
             {p.uppercase ? 'CIAO ' : 'Ciao '}<span style={{ color: p.highlight }}>{p.uppercase ? 'RAGA' : 'raga'}</span>
           </span>

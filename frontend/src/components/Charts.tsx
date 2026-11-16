@@ -25,7 +25,7 @@ function roundedTopBar(x: number, y: number, w: number, h: number, r = 4): strin
   return `M${x},${y + h}V${y + rr}Q${x},${y} ${x + rr},${y}H${x + w - rr}Q${x + w},${y} ${x + w},${y + rr}V${y + h}Z`
 }
 
-export function ColumnChart({ data, color = '#8b5cf6', height = 180, label, format = (v) => String(v) }: {
+export function ColumnChart({ data, color = '#ff5a1f', height = 180, label, format = (v) => String(v) }: {
   data: { key: string; label: string; value: number }[]
   color?: string
   height?: number
@@ -93,7 +93,7 @@ export function BarList({ rows, format = (v) => String(v), max: maxIn }: {
           </div>
           <div className="h-2 rounded-full bg-ink-800">
             <div className="h-2 rounded-r-full transition-[width] duration-500 group-hover:brightness-125"
-                 style={{ width: `${(r.value / max) * 100}%`, background: r.color ?? '#8b5cf6', minWidth: r.value > 0 ? 3 : 0 }} />
+                 style={{ width: `${(r.value / max) * 100}%`, background: r.color ?? '#ff5a1f', minWidth: r.value > 0 ? 3 : 0 }} />
           </div>
         </li>
       ))}

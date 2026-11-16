@@ -78,7 +78,7 @@ export function SubtitleEditor() {
         } />
       {!cues && <Spinner />}
       {clip && cues && (
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
           <div className="card p-4">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <Badge tone={edited ? 'amber' : 'zinc'}>{edited ? 'modificati a mano' : 'automatici (Whisper)'}</Badge>

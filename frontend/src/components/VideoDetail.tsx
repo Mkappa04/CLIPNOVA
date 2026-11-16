@@ -85,7 +85,7 @@ export function VideoDetail({ videoId, onClose, onChanged }: { videoId: string |
     <Modal open onClose={onClose} title={video?.title ?? 'Video'} wide>
       {!video || !form ? <p className="text-sm text-zinc-400">Caricamento…</p> : (
         <div className="space-y-6">
-          <div className="grid gap-5 lg:grid-cols-5">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-5">
             <div className="lg:col-span-3">
               <video key={video.id} controls preload="metadata" className="aspect-video w-full rounded-xl bg-black"
                      src={api.streamUrl(video.id)} poster={video.has_thumbnail ? api.thumbnailUrl(video) : undefined} />

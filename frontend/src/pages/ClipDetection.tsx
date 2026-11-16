@@ -211,7 +211,7 @@ export function ClipDetection() {
           )}
 
           {a?.status === 'completed' && (
-            <div className="grid gap-5 lg:grid-cols-12">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-12">
               <section className="lg:col-span-5">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <h2 className="mr-auto font-display text-lg font-semibold text-white">Clip ({shown.length})</h2>

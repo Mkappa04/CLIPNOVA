@@ -145,7 +145,7 @@ export function AutoImport() {
       {!status && <Spinner />}
       {status && sched && (
         <div className="space-y-6">
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div className="card p-4 text-sm">
               <div className="text-xs uppercase tracking-wider text-zinc-500">Watcher</div>
               <div className="mt-1 font-semibold text-white">
