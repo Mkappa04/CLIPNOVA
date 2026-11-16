@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from backend.clip_detection import pipeline
 from backend.clip_detection.lexicon import CATEGORY_KEYWORDS, GAME_KEYWORDS
 from backend.clip_detection.scoring import CATEGORIES, LABELS, ScoringConfig
+from backend.core.config import get_settings
 from backend.core.exceptions import ConflictError, NotFoundError, ValidationFailed
 from backend.database.session import get_db
 from backend.models.entities import ACTIVE_JOB_STATUSES, AnalysisStatus, Job, VideoStatus
@@ -93,3 +94,39 @@ def rescore(video_id: str, cfg: ScoringConfig, db: Session = Depends(get_db)):
     from backend.api.routers.clips import clip_out
 
     return [clip_out(c) for c in sorted(video.clips, key=lambda c: c.start)]
+
+
+@router.post("/videos/{video_id}/rerank", response_model=list[ClipOut])
+def rerank(video_id: str, db: Session = Depends(get_db)):
+    """Re-run the local-LLM comparison using your latest approved/rejected clips as examples, then re-score."""
+    from backend.clip_detection import semantic
+    from backend.clip_detection.preferences import collect_examples
+
+    video = vs.get_video(db, video_id)
+    analysis = video.analysis
+    sem = semantic.load_cached(pipeline.cache_dir(video_id))
+    if analysis is None or analysis.status != AnalysisStatus.COMPLETED.value or not sem:
+        raise ValidationFailed("Serve un'analisi completata con l'analisi semantica (LLM locale)")
+    if not semantic.status()["available"]:
+        raise ValidationFailed("LLM locale non disponibile")
+    import json as _json
+
+    examples = collect_examples(db)
+    sem = semantic.rank_candidates(sem, game=video.game, examples=examples, force=True)
+    (pipeline.cache_dir(video_id) / semantic.SEMANTIC_FILE).write_text(_json.dumps(sem, ensure_ascii=False))
+    cfg = ScoringConfig.model_validate(analysis.config or {})
+    _tl, detected = pipeline.score_video(video, analysis, cfg, examples=examples)
+    pipeline.replace_detected_clips(db, video, detected, analysis.language)
+    db.commit()
+    from backend.api.routers.clips import clip_out
+
+    return [clip_out(c) for c in sorted(video.clips, key=lambda c: c.start)]
+
+
+@router.get("/preferences")
+def preferences_status(db: Session = Depends(get_db)) -> dict:
+    from backend.clip_detection.preferences import MIN_POSITIVE, collect_examples
+
+    ex = collect_examples(db)
+    return {"positive": len(ex["positive"]), "negative": len(ex["negative"]), "min_positive": MIN_POSITIVE,
+            "active": len(ex["positive"]) >= MIN_POSITIVE, "model": get_settings().preference_embed_model}

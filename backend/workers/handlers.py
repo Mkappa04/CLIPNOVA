@@ -163,7 +163,7 @@ def run_analysis_job(ctx, video_id: str, opts: dict) -> dict:
         analysis.config = cfg.model_dump()
         stats = {
             "decoder": info["decoder"], "media_cached": info["media_cached"], "timings": info["timings"],
-            "audio": info["audio_stats"], "scenes": len(info["scenes"]),
+            "audio": info["audio_stats"], "scenes": len(info["scenes"]), "semantic": info.get("semantic"),
         }
         if transcript:
             stats["transcript"] = {

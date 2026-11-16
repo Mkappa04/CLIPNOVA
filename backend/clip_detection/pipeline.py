@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from backend.clip_detection import audio as audio_mod
 from backend.clip_detection import visual
 from backend.clip_detection.media_prep import prepare_media
-from backend.clip_detection.scoring import DetectedClip, RawSignals, ScoringConfig, Timeline, detect_clips
+from backend.clip_detection.scoring import DetectedClip, RawSignals, ScoringConfig, Timeline
 from backend.core.config import get_settings
 from backend.models.entities import Analysis, AnalysisStatus, Clip, ClipStatus, Video
 from backend.transcription import whisper_engine
@@ -98,7 +98,7 @@ def run_analysis(
     tpath = cdir / TRANSCRIPT_FILE
     if transcribe and media.audio is not None:
         t = time.monotonic()
-        st = Stage(report, 0.50, 0.95, "Trascrizione (faster-whisper)")
+        st = Stage(report, 0.50, 0.85, "Trascrizione (faster-whisper)")
         cached = _load_cached_transcript(tpath, language) if not force else None
         if cached is not None:
             transcript = cached
@@ -112,8 +112,37 @@ def run_analysis(
     elif tpath.exists() and not transcribe:
         tpath.unlink()
 
-    report(0.96, "Scoring delle clip")
+    semantic_info = None
+    if transcript is not None and transcript.segments and cfg.use_semantic:
+        from backend.clip_detection import semantic
+
+        sstat = semantic.status()
+        if sstat["available"]:
+            t = time.monotonic()
+            st = Stage(report, 0.85, 0.96, "Analisi semantica (LLM locale)")
+            st(0, f"Analisi semantica con {sstat['model']}")
+            try:
+                from backend.clip_detection.preferences import collect_examples
+                from backend.database.session import session_scope
+
+                with session_scope() as db:
+                    examples = collect_examples(db)
+                data = semantic.judge_blocks(transcript, game=video.game, cache_dir=cdir, on_progress=st,
+                                             should_cancel=should_cancel, examples=examples)
+                semantic_info = {"model": data["model"], "blocks": data["blocks"],
+                                 "judged": len(data["judgements"]), "elapsed_s": data["elapsed_s"]}
+            except InterruptedError:
+                raise
+            except Exception as e:  # noqa: BLE001 - semantic pass is an enhancement, never fatal
+                log.warning("Semantic analysis failed: %s", e)
+                semantic_info = {"error": str(e)[:200]}
+            timings["semantic"] = round(time.monotonic() - t, 1)
+        else:
+            semantic_info = {"skipped": sstat.get("reason", "LLM non disponibile")}
+
+    report(0.97, "Scoring delle clip")
     return {
+        "semantic": semantic_info,
         "decoder": media.decoder, "media_cached": media.cached, "scenes": scenes, "timings": timings,
         "audio_stats": feats.stats, "transcript": transcript,
     }
@@ -151,11 +180,41 @@ def load_raw(video_id: str, scenes: list[float]) -> RawSignals:
                           scenes=list(scenes), has_audio=meta["has_audio"])
 
 
-def score_video(video: Video, analysis: Analysis, cfg: ScoringConfig) -> tuple[Timeline, list[DetectedClip]]:
+def with_preferences(sem: dict | None, examples: dict | None) -> dict | None:
+    """Annotate semantic candidates with their affinity to the user's approved/rejected clips."""
+    from backend.clip_detection import preferences
+
+    if not sem or not sem.get("judgements") or not examples:
+        return sem
+    units = {u["id"]: u for u in sem.get("units", [])}
+    texts = [" ".join(units[k]["text"] for k in range(j["first"], j["last"] + 1) if k in units)
+             for j in sem["judgements"]]
+    aff = preferences.affinity(texts, examples)
+    if aff is not None:
+        for j, a in zip(sem["judgements"], aff):
+            j["pref"] = round(a, 3)
+        sem["preferences"] = preferences.describe(examples)
+    return sem
+
+
+def score_video(video: Video, analysis: Analysis, cfg: ScoringConfig,
+                examples: dict | None = None) -> tuple[Timeline, list[DetectedClip]]:
+    from backend.clip_detection import semantic
+    from backend.clip_detection.scoring import hybrid_clips
+
     raw = load_raw(video.id, analysis.scenes or [])
     if not raw.duration:
         raw.duration = float(video.duration or len(raw.rms_db) * raw.window_s)
-    return detect_clips(raw, load_transcript(video.id), video.game, cfg)
+    sem = semantic.load_cached(cache_dir(video.id))
+    if cfg.use_semantic and examples is None and sem:
+        from sqlalchemy.orm import object_session
+
+        from backend.clip_detection.preferences import collect_examples
+
+        db = object_session(video)
+        examples = collect_examples(db) if db is not None else None
+    sem = with_preferences(sem, examples) if cfg.use_semantic else sem
+    return hybrid_clips(raw, load_transcript(video.id), video.game, cfg, sem)
 
 
 def replace_detected_clips(db: Session, video: Video, detected: list[DetectedClip], language: str) -> list[Clip]:

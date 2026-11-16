@@ -1,4 +1,4 @@
-import { ChevronDown, Cpu, Download, Plus, ScanSearch, Sparkles, Wand2 } from 'lucide-react'
+import { ChevronDown, Cpu, Download, Heart, Plus, ScanSearch, Sparkles, Wand2 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { ClipInspector } from '../components/ClipInspector'
@@ -13,7 +13,7 @@ import { toast } from '../stores/toastStore'
 import type { AnalysisResponse, Clip, ClipCategory, ScoringConfig } from '../types'
 
 const STEP_LABELS: Record<string, string> = {
-  prepare: 'Proxy+audio', audio: 'Audio', scenes: 'Scene', motion: 'Movimento', transcription: 'Trascrizione',
+  prepare: 'Proxy+audio', audio: 'Audio', scenes: 'Scene', motion: 'Movimento', transcription: 'Trascrizione', semantic: 'AI locale',
 }
 
 export function ClipDetection() {
@@ -42,6 +42,18 @@ export function ClipDetection() {
   const [showScoring, setShowScoring] = useState(false)
   const [manual, setManual] = useState({ start: 0, end: 20, category: 'gameplay_highlight' as ClipCategory })
   const lastJobState = useRef<string | undefined>(undefined)
+  const { data: prefs, reload: reloadPrefs } = useApi(() => api.preferences(), [])
+  const [reranking, setReranking] = useState(false)
+
+  const rerank = async () => {
+    if (!videoId) return
+    setReranking(true)
+    try {
+      const c = await api.rerank(videoId)
+      setClips(c); setAnalysis(await api.analysis(videoId)); reloadPrefs()
+      toast.success('Clip riordinate secondo le tue scelte')
+    } catch (e) { toast.error(e) } finally { setReranking(false) }
+  }
 
   const loadAll = async (id: string) => {
     try {
@@ -162,6 +174,16 @@ export function ClipDetection() {
               {!!a.stats.transcript?.filtered_hallucinations && <Badge tone="amber">{a.stats.transcript.filtered_hallucinations} allucinazioni filtrate</Badge>}
               <Badge>decoder {a.stats.decoder}</Badge>
               {a.stats.timings && <Badge>⏱ {Object.entries(a.stats.timings).map(([k, v]) => `${STEP_LABELS[k] ?? k} ${v}s`).join(' · ')}</Badge>}
+              {prefs && (
+                <span className="flex items-center gap-2">
+                  <Badge tone={prefs.active ? 'green' : 'zinc'}><Heart size={11} /> {prefs.active
+                    ? `I tuoi gusti: ${prefs.positive} scelte, ${prefs.negative} scartate`
+                    : `I tuoi gusti: servono almeno ${prefs.min_positive} clip approvate/esportate`}</Badge>
+                  {prefs.active && <button className="btn-cyan px-2 py-1 text-xs" disabled={reranking} onClick={rerank}
+                    title="L'LLM locale riconfronta i candidati usando le tue clip approvate e rifiutate come esempi (~30-60 s)">
+                    {reranking ? <Spinner /> : <Heart size={12} />} Riordina con i miei gusti</button>}
+                </span>
+              )}
               {a.language && (
                 <span className="ml-auto flex gap-2">
                   <a className="btn-ghost px-2 py-1 text-xs" href={api.transcriptUrl(video.id, 'srt')}><Download size={13} /> SRT</a>

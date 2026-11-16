@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     )
 
     app_name: str = "CLIPNOVA"
-    version: str = "1.0.0"
+    version: str = "1.1.0"
 
     host: str = "127.0.0.1"
     port: int = 8000
@@ -85,6 +85,12 @@ class Settings(BaseSettings):
     llm_model: str = "qwen3.5:4b"
     llm_url: str = "http://127.0.0.1:11434"
     llm_timeout_s: float = 120.0
+    # Semantic clip detection with the local LLM: "auto" = use Ollama when the model is available, "off" = heuristics only
+    semantic_scoring: str = "auto"
+    # Model for semantic clip judgement (bigger = better story understanding); falls back to llm_model
+    semantic_model: str = "qwen3:8b"
+    # Embedding model used to learn your taste from approved/rejected clips (multilingual, small)
+    preference_embed_model: str = "embeddinggemma"
 
     # Optional extra copy of every export package, e.g. a Windows folder:
     # /mnt/c/Users/<you>/Videos/CLIPNOVA  (so you can upload from the Windows browser)

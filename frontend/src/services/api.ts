@@ -83,6 +83,8 @@ export const api = {
   analyze: (videoId: string, body: { language: 'auto' | 'it' | 'en'; transcribe: boolean; force: boolean; scoring?: ScoringConfig }) =>
     request<{ job_id: string }>(`/api/videos/${videoId}/analyze`, { method: 'POST', body: JSON.stringify(body) }),
   analysis: (videoId: string) => request<AnalysisResponse>(`/api/videos/${videoId}/analysis`),
+  rerank: (videoId: string) => request<Clip[]>(`/api/videos/${videoId}/rerank`, { method: 'POST' }),
+  preferences: () => request<{ positive: number; negative: number; min_positive: number; active: boolean; model: string }>('/api/preferences'),
   rescore: (videoId: string, cfg: ScoringConfig) =>
     request<Clip[]>(`/api/videos/${videoId}/detect`, { method: 'POST', body: JSON.stringify(cfg) }),
   scoringDefaults: () => request<{ config: ScoringConfig; weights_help: Record<string, string> }>('/api/scoring/defaults'),

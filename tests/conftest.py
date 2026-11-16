@@ -14,6 +14,8 @@ os.environ["CLIPNOVA_DATA_DIR"] = str(_TMP / "data")
 os.environ["CLIPNOVA_LOG_LEVEL"] = "WARNING"
 os.environ.pop("CLIPNOVA_DATABASE_URL", None)
 os.environ["CLIPNOVA_AUTOMATION_ENABLED"] = "false"  # tests drive the watcher with explicit tick() calls
+os.environ["CLIPNOVA_SEMANTIC_SCORING"] = "off"  # no real LLM calls in tests (semantic tests use a mocked Ollama)
+os.environ["CLIPNOVA_PUBLISHING_ENABLED"] = "false"  # tests assume the default, whatever the local .env says
 # Small Whisper models + shared model cache so tests don't re-download weights
 os.environ["CLIPNOVA_WHISPER_MODEL"] = "tiny"
 os.environ["CLIPNOVA_WHISPER_CPU_MODEL"] = "tiny"

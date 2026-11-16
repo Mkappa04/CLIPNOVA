@@ -9,6 +9,7 @@ produced its score and category, so the user can judge it.
 from __future__ import annotations
 
 import math
+from collections import Counter
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -44,15 +45,18 @@ class ScoringWeights(BaseModel):
 
 class ScoringConfig(BaseModel):
     weights: ScoringWeights = Field(default_factory=ScoringWeights)
-    min_clip_s: float = Field(15, ge=3, le=180)
-    max_clip_s: float = Field(60, ge=5, le=600)
-    pre_roll_s: float = Field(12, ge=0, le=120, description="Context kept before the peak")
-    post_roll_s: float = Field(6, ge=0, le=120, description="Context kept after the peak")
+    min_clip_s: float = Field(20, ge=3, le=180)
+    max_clip_s: float = Field(75, ge=5, le=600)
+    pre_roll_s: float = Field(18, ge=0, le=120, description="Context kept before the peak")
+    post_roll_s: float = Field(8, ge=0, le=120, description="Context kept after the peak")
     max_clips: int = Field(12, ge=1, le=100)
     min_score: float = Field(30, ge=0, le=100)
-    min_gap_s: float = Field(4, ge=0, le=120)
+    min_gap_s: float = Field(1, ge=0, le=120)
     smoothing_s: float = Field(2, ge=0.5, le=30)
     reason_language: str = Field("it", pattern="^(it|en)$")
+    use_semantic: bool = Field(True, description="Use the local-LLM judgement when available")
+    semantic_min: float = Field(3.5, ge=0, le=10, description="Minimum LLM rating (0-10): the best moments are kept even when the video has no viral ones")
+    semantic_weight: float = Field(0.7, ge=0, le=1, description="Share of the final score from the LLM rating")
 
 
 # ----------------------------------------------------------------- helpers
@@ -138,7 +142,11 @@ def build_timeline(raw: RawSignals, transcript: Transcript | None, game: str, cf
     speech_excitement = (speech * (0.5 * rate_norm + 0.5 * audio_peak)).astype(np.float32)
 
     kw_hits = [h for h in hits if h.category not in ("storytelling",)]
-    kw_weights = [0.5 if h.category == "gameplay_highlight" else 1.0 for h in kw_hits]
+    # Rarity weighting: a cue said all the time in THIS video (Italian fillers like «ma che», «allora»)
+    # carries almost no information; a rare one does.
+    freq = Counter(h.keyword for h in kw_hits)
+    kw_weights = [(0.5 if h.category == "gameplay_highlight" else 1.0) / (1.0 + math.log(freq[h.keyword]))
+                  for h in kw_hits]
     keywords = saturate(spread(n, [h.time for h in kw_hits], ws, 2.0, kw_weights), 1.0).astype(np.float32)
     laughter = saturate(spread(n, laughs, ws, 2.0), 0.8).astype(np.float32)
 
@@ -391,6 +399,94 @@ def detect_clips(raw: RawSignals, transcript: Transcript | None, game: str, cfg:
         ))
     clips.sort(key=lambda c: c.start)
     return tl, clips
+
+
+# ----------------------------------------------------------------- semantic (local LLM) selection
+def semantic_clips(tl: Timeline, raw: RawSignals, semantic: dict, cfg: ScoringConfig, game: str) -> list[DetectedClip]:
+    """Clips proposed by the local LLM, on whole thought units, blended with the signal score."""
+    units = {u["id"]: u for u in semantic.get("units", [])}
+    out: list[DetectedClip] = []
+    lang = cfg.reason_language
+    n_ranked = sum(1 for j in semantic.get("judgements", []) if "rank" in j)
+    for j in semantic.get("judgements", []):
+        if j["score"] < cfg.semantic_min or j["first"] not in units or j["last"] not in units:
+            continue
+        # Relative quality: the listwise rank spreads candidates from 2 to 10 (absolute ratings are often flat)
+        rank_score = (10 - 8 * (j["rank"] - 1) / max(1, n_ranked - 1)) if "rank" in j else None
+        llm10 = 0.5 * rank_score + 0.5 * j["score"] if rank_score is not None else j["score"]
+        pref = j.get("pref")  # 0..1 affinity with the clips you approved/rejected (None = not enough examples)
+        if pref is not None:
+            llm10 = 0.5 * (2 + 8 * pref) + 0.5 * llm10
+        first, last = j["first"], j["last"]
+        # The LLM picked a whole thought: only pad very short spans (padding a complete story with filler hurts),
+        # adding previous units first (context); trim spans that are too long from the start.
+        min_len = min(cfg.min_clip_s, 12.0)
+        while units[last]["end"] - units[first]["start"] < min_len:
+            if first - 1 in units and (units[first]["start"] - units[first - 1]["start"]) < cfg.max_clip_s:
+                first -= 1
+            elif last + 1 in units:
+                last += 1
+            else:
+                break
+        while units[last]["end"] - units[first]["start"] > cfg.max_clip_s and first < last:
+            first += 1
+        start = max(0.0, units[first]["start"] - 0.3)
+        end = min(tl.duration, units[last]["end"] + 0.8)  # a breath of reaction after the payoff
+        seg = tl.interest[_window(tl, start, end)]
+        sig = float(seg.mean()) if len(seg) else 0.0
+        signal_score = 100 * float(saturate(sig * 2.2))
+        w = cfg.semantic_weight
+        score = round(w * llm10 * 10 + (1 - w) * signal_score, 1)
+        hook = j.get("hook", "")
+        peak = start + (end - start) / 2
+        if hook:
+            target = hook.lower().split()[0] if hook.split() else ""
+            for ws, _we, word in tl.words:
+                if start <= ws <= end and word.strip().lower().strip(",.!?") == target:
+                    peak = ws
+                    break
+        around = _window(tl, peak - 3, peak + 3)
+        signals = {k: round(float(v[around].mean()), 3) for k, v in tl.features.items() if k != "speech"}
+        cat = j["category"] if j["category"] in CATEGORIES else "storytelling"
+        conf = round(min(0.95, llm10 / 10 * (0.95 if j.get("standalone", True) else 0.65)), 2)
+        rank_txt = (f", {j['rank']}° su {n_ranked} nel confronto" if lang == "it" else f", #{j['rank']} of {n_ranked}") \
+            if "rank" in j else ""
+        if pref is not None:
+            level = "alta" if pref >= 0.66 else "media" if pref >= 0.33 else "bassa"
+            rank_txt += (f", affinità con le tue scelte {level}" if lang == "it" else f", affinity with your picks {level}")
+        head = (f"Valutazione AI locale {j['score']:.0f}/10{rank_txt} — {j.get('reason', '')}" if lang == "it"
+                else f"Local AI rating {j['score']:.0f}/10{rank_txt} — {j.get('reason', '')}")
+        sig_part = _reason(lang, tl, start, end, peak, signals, [], cat, raw).split("\n", 1)[-1]
+        title = f"\u201c{hook}\u201d {EMOJI[cat]}" if hook else f"{game} · {LABELS[lang][cat]} {EMOJI[cat]}"
+        out.append(DetectedClip(
+            start=round(start, 2), end=round(end, 2), peak_time=round(peak, 2), score=score, confidence=conf,
+            category=cat, category_scores={cat: round(j["score"] / 10, 3)}, signals=signals,
+            keywords=[hook] if hook else [], transcript=_clip_text(tl, start, end),
+            reason=head + "\n" + sig_part, suggested_title=title[:300]))
+    return out
+
+
+def hybrid_clips(raw: RawSignals, transcript: Transcript | None, game: str, cfg: ScoringConfig,
+                 semantic: dict | None) -> tuple[Timeline, list[DetectedClip]]:
+    """Semantic clips first; heuristic clips only fill gaps (e.g. explosions without speech)."""
+    tl, heuristic = detect_clips(raw, transcript, game, cfg)
+    if not (cfg.use_semantic and semantic and semantic.get("judgements")):
+        return tl, heuristic
+    chosen: list[DetectedClip] = []
+
+    def free(c: DetectedClip) -> bool:
+        return all(c.end <= o.start + 0.01 or c.start >= o.end - 0.01 for o in chosen)
+
+    for c in sorted(semantic_clips(tl, raw, semantic, cfg, game), key=lambda c: -c.score):
+        if len(chosen) < cfg.max_clips and c.score >= cfg.min_score and free(c):
+            chosen.append(c)
+    # heuristic moments the LLM cannot judge: little or no speech but strong audio/visual signals
+    for c in sorted(heuristic, key=lambda c: -c.score):
+        speechy = float(tl.features["speech"][_window(tl, c.start, c.end)].mean()) > 0.4
+        if len(chosen) < cfg.max_clips and not speechy and c.score >= max(cfg.min_score, 55) and free(c):
+            chosen.append(c)
+    chosen.sort(key=lambda c: c.start)
+    return tl, chosen
 
 
 def clip_transcript(transcript: Transcript | None, start: float, end: float) -> str:

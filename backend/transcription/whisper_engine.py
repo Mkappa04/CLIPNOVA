@@ -218,8 +218,9 @@ engine = WhisperEngine()
 
 
 # ---------------------------------------------------------------- process isolation + chunking
-CHUNK_TARGET_S = 45.0
-CHUNK_SEARCH_S = 6.0
+CHUNK_TARGET_S = 30.0  # short chunks: a CUDA crash loses little work
+CHUNK_SEARCH_S = 5.0
+GPU_TRIES_PER_CHUNK = 4  # crashes are intermittent: retrying on the GPU keeps the large model's quality
 MAX_GPU_RESTARTS = 8
 
 
@@ -348,7 +349,7 @@ def transcribe_isolated(
     gpu_disabled = False
 
     while next_idx < total:
-        force_cpu = gpu_disabled or crashes_per_chunk.get(next_idx, 0) >= 2
+        force_cpu = gpu_disabled or crashes_per_chunk.get(next_idx, 0) >= GPU_TRIES_PER_CHUNK
         q = ctx.Queue()
         proc = ctx.Process(target=_chunk_worker, daemon=True, name="clipnova-whisper",
                            args=(str(audio), chunks, next_idx, lang, "cpu" if force_cpu else None,

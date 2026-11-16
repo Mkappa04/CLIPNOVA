@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.1.0 — clip migliori
+
+- **Analisi semantica con LLM locale** (Ollama, default `qwen3:8b`, ripiego su `qwen3.5:4b`): il parlato viene diviso
+  in unità di pensiero (tagliate nelle pause) e valutato a blocchi di ~1 minuto con domande concrete (tipo e forza
+  del culmine, autonomia, chiacchiera generica); le clip iniziano e finiscono su pensieri interi; l'hook è sempre
+  una citazione verbatim. Poi una classifica comparativa di tutti i candidati.
+- **Impara dai tuoi gusti**: le clip che approvi/esporti e quelle che rifiuti diventano esempi. Affinità di contenuto
+  con embedding locali (`embeddinggemma`) a ogni ricalcolo + esempi nella classifica dell'LLM
+  (pulsante *Riordina con i miei gusti*).
+- Keyword pesate per rarità nel video (gli intercalari ripetuti non contano), clip più lunghe e complete (20–75 s),
+  selezione relativa (i momenti migliori anche in video senza picchi virali).
+- Stabilità LLM su GPU da 6 GB: valutazione e classifica usano la stessa istanza del modello (stesso contesto 4096,
+  niente scarica/ricarica in mezzo: la ricarica a 8192 token mandava in crash Ollama per memoria video esaurita);
+  il prompt della classifica viene accorciato per stare nel contesto (max 30 candidati); un nuovo tentativo
+  automatico se Ollama risponde 500.
+- Trascrizione: blocchi da 30 s, fino a 4 tentativi GPU per blocco prima della CPU (qualità del modello grande
+  nonostante i crash CUDA intermittenti).
+
 ## 1.0.0 — release locale (Milestone 5)
 
 - **Analytics**: produzione giornaliera (video importati, render), workflow (rilevate → renderizzate → approvate →

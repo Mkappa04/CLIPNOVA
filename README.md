@@ -244,12 +244,20 @@ Il server rifiuta di mettersi in ascolto su indirizzi diversi da localhost a men
 - **Manutenzione spazio** in Settings, **backup** (`scripts/backup.sh`), **diagnostica** (`scripts/doctor.sh`),
   servizio systemd opzionale (`scripts/install-service.sh`).
 
+### Clip migliori (1.1): AI locale e i tuoi gusti
+Con Ollama attivo (`qwen3:8b` consigliato) l'analisi aggiunge una **valutazione semantica**: storie con un finale,
+battute, rivelazioni e reazioni vengono riconosciute nel parlato, le clip seguono pensieri interi e i titoli citano
+frasi davvero dette. Le clip che **approvi/esporti o rifiuti** insegnano a CLIPNOVA cosa ti piace (embedding locali
+`embeddinggemma` + esempi per l'LLM): servono almeno 2 clip approvate; *Clip Detection → Riordina con i miei gusti*.
+Limite onesto: un modello da 4–8B giudica male il "divertente" in assoluto; i tuoi esempi sono il segnale più affidabile.
+
 ### Note tecniche: crash CUDA della trascrizione
 Su questo PC (RTX 3060 Laptop, driver Windows 610.74, WSL 2) CTranslate2 va in errore CUDA
 (`cudaErrorIllegalAddress` / `IllegalInstruction`) dopo decine di secondi di inferenza continua su audio reale,
 in modo casuale, con qualunque modello e precisione (anche CTranslate2 4.6). FFmpeg/NVENC e i campioni brevi non ne
 risentono. La trascrizione a blocchi rende il problema innocuo (10 min di audio in 202 s con 5 crash). Probabili
-cause da verificare: driver NVIDIA di Windows o librerie CUDA 12.9 / cuDNN 9.28 installate via pip.
+cause escluse: librerie CUDA (anche 12.4/cuDNN 9.1), versione di CTranslate2 (anche 4.6), allocatore, precisione
+(anche float32). Restano driver NVIDIA di Windows o overclock/undervolt della GPU: verificali lato Windows.
 
 ## Test
 
