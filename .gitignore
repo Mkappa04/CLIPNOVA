@@ -1,11 +1,51 @@
+# --- Python ---
 .venv/
+venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*.egg-info/
 .pytest_cache/
-.env
-/data/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# --- Frontend ---
 frontend/node_modules/
 frontend/dist/
 frontend/*.tsbuildinfo
-*.log
+frontend/.vite/
+
+# --- Segreti e configurazione locale ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+secrets/
+
+# --- Dati locali: database, video importati, render, export, log ---
+/data/
 /backups/
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*.log
+
+# --- Media generati fuori da data/ ---
+/renders/
+/exports/
+*.tmp.wav
+
+# --- Editor e sistema ---
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
+
+# --- Claude Code (impostazioni personali) ---
+.claude/settings.local.json

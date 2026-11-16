@@ -468,7 +468,7 @@ def plan_look(cfg: EditConfig, policy: PlannerPolicy, summary: DirectorSummary) 
     grade, why = policy.look, "look del preset"
     kind = summary.content_kind.lower()
     if summary.style == "cinematic" and summary.dominant in ("tension", "emotional", "spectacular"):
-        grade, why = "cinematic", f"momento {_label(summary.dominant).lower()}: look cinematografico"
+        grade, why = "cinematic", f"{_label(summary.dominant)}: look cinematografico"
     elif "sport" in kind:
         grade, why = "punchy", "sport: colori decisi"
     elif "podcast" in kind or "parla" in kind:
@@ -524,7 +524,7 @@ def plan_music(inp: PlannerInput, cands: list[Candidate], policy: PlannerPolicy,
             mood, why = mood_hint, "mood scelto dall'AI locale"
         else:
             mood = next((m for m in allowed if m in prefs), allowed[0])
-            why = f"momenti {_label(summary.dominant).lower()}" if summary.dominant else "stile del preset"
+            why = f"adatto a: {_label(summary.dominant).lower()}" if summary.dominant else "stile del preset"
     track = choose_track(catalog, mood, summary.energy, inp.duration, seed_for(inp.clip_id, mood), cfg.music_track)
     if track is None:
         other = next((m for m in (policy.music_moods or MUSIC_MOODS) if
